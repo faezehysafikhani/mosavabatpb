@@ -95,10 +95,10 @@ export const ApprovalsView: React.FC = () => {
   return (
     <div className="space-y-5 pb-12">
       {/* Header */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-100 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-purple-700" />
+          <h1 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-blue-600" />
             <span>کارتابل صحه‌گذاری و تأییدات مصوبات</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -108,14 +108,14 @@ export const ApprovalsView: React.FC = () => {
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="relative">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="جستجو در عنوان، شماره مصوبه یا نام مجری..."
-            className="w-full text-xs p-2.5 pr-8 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+            className="w-full text-xs p-2.5 pr-8 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none placeholder-slate-400"
           />
           <Search className="w-4 h-4 text-slate-400 absolute right-2.5 top-3" />
         </div>
@@ -124,7 +124,7 @@ export const ApprovalsView: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none font-medium"
+            className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-700"
           >
             <option value="ALL">تمام موارد صحه‌گذاری</option>
             <option value="PENDING">در انتظار بررسی من (Pending)</option>
@@ -137,8 +137,8 @@ export const ApprovalsView: React.FC = () => {
       {/* Approvals List */}
       <div className="space-y-3">
         {approvals.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 shadow-xs">
-            <ShieldCheck className="w-12 h-12 text-purple-300 mx-auto mb-3" />
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-100 shadow-xs">
+            <ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-slate-700">هیچ موردی در انتظار صحه‌گذاری شما نیست</h3>
             <p className="text-xs text-slate-400 mt-1">کلیه گزارش‌های تکمیلی بررسی شده‌اند.</p>
           </div>
@@ -150,19 +150,19 @@ export const ApprovalsView: React.FC = () => {
               <div
                 key={appr.id}
                 onClick={() => setSelectedResolutionId(appr.resolutionId)}
-                className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 hover:border-purple-400 transition-all cursor-pointer space-y-3"
+                className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-100 hover:border-slate-200 hover:shadow-md transition-all cursor-pointer space-y-3 group"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-purple-900 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200">
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
                       {appr.resolutionNumber}
                     </span>
-                    <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-md">
+                    <span className="text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full">
                       مرحله {toPersianDigits(appr.stepNumber)} از {toPersianDigits(appr.totalSteps)}
                     </span>
                     <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                       isPending
-                        ? 'bg-purple-50 text-purple-700 border-purple-200'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
                         : appr.status === 'APPROVED'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -175,7 +175,7 @@ export const ApprovalsView: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={(e) => handleOpenActionModal(e, appr, 'REJECT')}
-                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs py-1.5 px-3 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs py-1.5 px-3 rounded-full transition-colors flex items-center gap-1 cursor-pointer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>رد / بازگشت</span>
@@ -183,7 +183,7 @@ export const ApprovalsView: React.FC = () => {
 
                       <button
                         onClick={(e) => handleOpenActionModal(e, appr, 'APPROVE')}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-1.5 px-4 rounded-xl shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-1.5 px-4 rounded-full shadow-xs transition-colors flex items-center gap-1 cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
                         <span>تایید صحه‌گذاری</span>
@@ -192,11 +192,11 @@ export const ApprovalsView: React.FC = () => {
                   )}
                 </div>
 
-                <h3 className="text-sm font-extrabold text-slate-800">
+                <h3 className="text-sm font-bold text-slate-800 group-hover:text-blue-900 transition-colors">
                   {appr.resolutionTitle}
                 </h3>
 
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-1.5">
+                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-1.5">
                   <div className="flex items-center justify-between text-xs text-slate-600">
                     <div>
                       <strong>مجری:</strong> {appr.responsibleName} ({appr.responsibleDepartment})
@@ -206,7 +206,7 @@ export const ApprovalsView: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-xs text-slate-700 font-medium">
-                    <span className="font-bold text-purple-900 block mb-0.5">گزارش اتمام کار ثبت شده:</span>
+                    <span className="font-bold text-slate-800 block mb-0.5">گزارش اتمام کار ثبت شده:</span>
                     {appr.completionReport}
                   </div>
                 </div>
@@ -214,7 +214,7 @@ export const ApprovalsView: React.FC = () => {
                 <div className="text-[11px] text-slate-400 flex items-center gap-2 pt-1">
                   <span>مرجع: {appr.meetingTitle}</span>
                   <span>•</span>
-                  <span>کلیک جهت مشاهده پرونده کامل مصوبه و مستندات</span>
+                  <span className="text-blue-600 font-medium">مشاهده پرونده کامل مصوبه و مستندات</span>
                 </div>
               </div>
             );
@@ -227,10 +227,10 @@ export const ApprovalsView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-5 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-extrabold text-slate-800">
+              <h3 className="text-sm font-bold text-slate-800">
                 {actionType === 'APPROVE' ? 'تایید مرحله صحه‌گذاری' : 'عدم تایید و بازگشت به مجری'}
               </h3>
-              <button onClick={() => setActiveItem(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setActiveItem(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -249,7 +249,7 @@ export const ApprovalsView: React.FC = () => {
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder={actionType === 'APPROVE' ? 'مورد تایید است.' : 'علت بازگشت را شرح دهید...'}
-                className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
 
@@ -257,7 +257,7 @@ export const ApprovalsView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveItem(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer"
               >
                 انصراف
               </button>
@@ -266,8 +266,8 @@ export const ApprovalsView: React.FC = () => {
                 type="button"
                 onClick={handleConfirmAction}
                 disabled={isSubmitting}
-                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-colors ${
-                  actionType === 'APPROVE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                className={`px-5 py-2 text-xs font-bold text-white rounded-full shadow-xs transition-colors cursor-pointer ${
+                  actionType === 'APPROVE' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-rose-600 hover:bg-rose-700'
                 }`}
               >
                 {isSubmitting ? 'در حال ثبت...' : actionType === 'APPROVE' ? 'تایید نهایی' : 'ثبت عدم تایید'}

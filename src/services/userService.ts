@@ -5,6 +5,7 @@ import { apiClient } from './api/apiClient';
 export interface IUserService {
   getUsers(): Promise<ApiResponse<User[]>>;
   getUserById(id: string): Promise<ApiResponse<User | null>>;
+  createUser(dto: Omit<User, 'id'>): Promise<ApiResponse<User>>;
   getDepartments(): Promise<ApiResponse<Department[]>>;
   getOrganizations(): Promise<ApiResponse<Organization[]>>;
   getNotifications(userId?: string): Promise<ApiResponse<AppNotification[]>>;
@@ -12,10 +13,10 @@ export interface IUserService {
 }
 
 class MockUserService implements IUserService {
-  private users: User[] = [...mockUsers];
-  private departments: Department[] = [...mockDepartments];
-  private organizations: Organization[] = [...mockOrganizations];
-  private notifications: AppNotification[] = [...mockNotifications];
+  private users: User[] = mockUsers;
+  private departments: Department[] = mockDepartments;
+  private organizations: Organization[] = mockOrganizations;
+  private notifications: AppNotification[] = mockNotifications;
 
   public async getUsers(): Promise<ApiResponse<User[]>> {
     return apiClient.simulateNetwork(this.users, 100);
@@ -24,6 +25,15 @@ class MockUserService implements IUserService {
   public async getUserById(id: string): Promise<ApiResponse<User | null>> {
     const user = this.users.find((u) => u.id === id) || null;
     return apiClient.simulateNetwork(user, 80);
+  }
+
+  public async createUser(dto: Omit<User, 'id'>): Promise<ApiResponse<User>> {
+    const newUser: User = {
+      id: `user-${Date.now()}`,
+      ...dto,
+    };
+    this.users.unshift(newUser);
+    return apiClient.simulateNetwork(newUser, 100);
   }
 
   public async getDepartments(): Promise<ApiResponse<Department[]>> {

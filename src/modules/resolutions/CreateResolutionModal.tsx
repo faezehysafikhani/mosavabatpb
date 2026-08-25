@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { resolutionService } from '../../services/resolutionService';
-import { mockUsers, mockDepartments, mockMeetings } from '../../mock/data';
+import { mockDepartments, mockMeetings } from '../../mock/data';
+import { PersianDatePicker } from '../../components/common/PersianDatePicker';
 import { 
   X, 
   Plus, 
@@ -13,7 +14,9 @@ import {
   ArrowLeft, 
   AlertTriangle,
   Send,
-  Layers
+  Layers,
+  Lock,
+  Building2
 } from 'lucide-react';
 import { 
   ResolutionApprovalStatus, 
@@ -27,17 +30,22 @@ interface CreateResolutionModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultMeetingId?: string;
+  defaultAgendaItemId?: string;
+  defaultTopicTitle?: string;
 }
 
 export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   isOpen,
   onClose,
   defaultMeetingId,
+  defaultAgendaItemId,
+  defaultTopicTitle,
 }) => {
-  const { showToast, triggerRefresh } = useApp();
+  const { availableUsers, showToast, triggerRefresh } = useApp();
 
   const [selectedMeetingId, setSelectedMeetingId] = useState(defaultMeetingId || mockMeetings[0].id);
-  const [topicTitle, setTopicTitle] = useState('');
+  const [selectedAgendaItemId, setSelectedAgendaItemId] = useState(defaultAgendaItemId || '');
+  const [topicTitle, setTopicTitle] = useState(defaultTopicTitle || '');
   const [proposerName, setProposerName] = useState('مهندس پوریا حسینی');
   const [proposerDepartment, setProposerDepartment] = useState('اداره کل فناوری اطلاعات و ارتباطات');
   const [requestDescription, setRequestDescription] = useState('');
@@ -46,7 +54,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
 
   // Execution Details
   const [executionDescription, setExecutionDescription] = useState('');
-  const [mainResponsibleUserId, setMainResponsibleUserId] = useState('user-2');
+  const [mainResponsibleUserId, setMainResponsibleUserId] = useState(availableUsers[1]?.id || 'user-2');
   const [responsibleDepartmentId, setResponsibleDepartmentId] = useState('dept-1');
   const [assignedDateJalali, setAssignedDateJalali] = useState('۱۴۰۳/۰۶/۲۸');
   const [deadlineJalali, setDeadlineJalali] = useState('۱۴۰۳/۰۷/۲۰');
@@ -59,26 +67,47 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
     {
       stepNumber: 1,
       approverId: 'user-3',
-      approverName: 'دکتر محمدرضا تقوی',
-      approverRole: 'رئیس مرکز امنیت و زیرساخت',
+      approverName: 'دکتر مسعود احمدی',
+      approverRole: 'معاون برنامه‌ریزی و نظارت راهبردی',
       status: 'NOT_STARTED',
     },
     {
       stepNumber: 2,
       approverId: 'user-1',
-      approverName: 'دکتر علیرضا احمدی',
-      approverRole: 'معاون برنامه‌ریزی و فناوری',
+      approverName: 'دکتر علیرضا رستمی',
+      approverRole: 'رئیس سازمان و رئیس شورا',
       status: 'NOT_STARTED',
     },
   ]);
 
-  const [newStepApproverId, setNewStepApproverId] = useState('user-5');
+  const [newStepApproverId, setNewStepApproverId] = useState(availableUsers[3]?.id || 'user-4');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Sync with props when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (defaultMeetingId) setSelectedMeetingId(defaultMeetingId);
+      if (defaultAgendaItemId) setSelectedAgendaItemId(defaultAgendaItemId);
+      if (defaultTopicTitle) setTopicTitle(defaultTopicTitle);
+    }
+  }, [isOpen, defaultMeetingId, defaultAgendaItemId, defaultTopicTitle]);
+
+  // Auto-fill responsible department when mainResponsibleUserId changes (Requirement 8)
+  useEffect(() => {
+    const user = availableUsers.find((u) => u.id === mainResponsibleUserId);
+    if (user && user.departmentId) {
+      setResponsibleDepartmentId(user.departmentId);
+    }
+  }, [mainResponsibleUserId, availableUsers]);
 
   if (!isOpen) return null;
 
+  const currentResponsibleUser = availableUsers.find((u) => u.id === mainResponsibleUserId);
+  const currentResponsibleDept = mockDepartments.find((d) => d.id === responsibleDepartmentId) || 
+    { id: 'dept-1', name: currentResponsibleUser?.departmentName || 'اداره کل فناوری اطلاعات و ارتباطات' };
+
   const handleAddVerificationStep = () => {
-    const user = mockUsers.find((u) => u.id === newStepApproverId);
+    const user = availableUsers.find((u) => u.id === newStepApproverId);
     if (!user) return;
 
     const newStep: VerificationStep = {
@@ -100,16 +129,17 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
     );
   };
 
+  const isLockedMeeting = Boolean(defaultMeetingId);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topicTitle) {
+    if (!topicTitle.trim()) {
       showToast('خطا', 'عنوان مصوبه الزامی است.', 'error');
       return;
     }
 
     const meeting = mockMeetings.find((m) => m.id === selectedMeetingId) || mockMeetings[0];
-    const responsibleUser = mockUsers.find((u) => u.id === mainResponsibleUserId);
-    const responsibleDept = mockDepartments.find((d) => d.id === responsibleDepartmentId);
+    const responsibleUser = availableUsers.find((u) => u.id === mainResponsibleUserId);
 
     setIsSubmitting(true);
     try {
@@ -124,17 +154,19 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
         meetingId: meeting.id,
         meetingTitle: meeting.title,
         meetingNumber: meeting.meetingNumber,
-        topicTitle,
+        agendaItemId: selectedAgendaItemId || undefined,
+        agendaItemTitle: defaultTopicTitle || undefined,
+        topicTitle: topicTitle.trim(),
         proposerName,
         proposerDepartment,
         requestDescription,
         reviewResultNotes,
         approvalStatus,
-        executionDescription: executionDescription || requestDescription,
+        executionDescription: executionDescription || requestDescription || topicTitle,
         mainResponsibleUserId: responsibleUser?.id,
         mainResponsibleName: responsibleUser?.fullName,
-        responsibleDepartmentId: responsibleDept?.id,
-        responsibleDepartmentName: responsibleDept?.name,
+        responsibleDepartmentId: currentResponsibleDept.id,
+        responsibleDepartmentName: currentResponsibleDept.name,
         assignedDateJalali,
         deadlineJalali,
         priority,
@@ -156,16 +188,18 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-teal-700 text-teal-200">
+            <div className="p-2 rounded-xl bg-teal-800 text-teal-200">
               <FileCheck2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">ثبت و تصویب مصوبه جدید سازمانی</h3>
-              <p className="text-[11px] text-teal-200">تنظیم اطلاعات ارجاع، اولویت و تعریف زنجیره صحه‌گذاری (Verification)</p>
+              <h3 className="text-sm font-bold text-white">ثبت و صدور مصوبه جدید سازمانی</h3>
+              <p className="text-[11px] text-teal-200">
+                {isLockedMeeting ? 'ثبت مستقیم مصوبه از دستور جلسه انتخاب‌شده' : 'تنظیم اطلاعات ارجاع، مسئول اجرا و زنجیره صحه‌گذاری'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="text-teal-200 hover:text-white p-1 rounded-lg hover:bg-teal-800">
@@ -179,21 +213,36 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-2">
               <span className="w-2 h-2 rounded-full bg-teal-600"></span>
-              مشخصات جلسه و پیشنهاد اولیه
+              مشخصات جلسه و مصوبه
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">جلسه مرجع *</label>
-                <select
-                  value={selectedMeetingId}
-                  onChange={(e) => setSelectedMeetingId(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                >
-                  {mockMeetings.map((m) => (
-                    <option key={m.id} value={m.id}>{m.meetingNumber} - {m.title}</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>جلسه مرجع *</span>
+                  {isLockedMeeting && (
+                    <span className="text-[10px] text-teal-800 font-bold flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      قفل شده بر اساس جلسه
+                    </span>
+                  )}
+                </label>
+                {isLockedMeeting ? (
+                  <div className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-teal-700" />
+                    <span>{mockMeetings.find((m) => m.id === selectedMeetingId)?.title || 'جلسه انتخاب‌شده'}</span>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedMeetingId}
+                    onChange={(e) => setSelectedMeetingId(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  >
+                    {mockMeetings.map((m) => (
+                      <option key={m.id} value={m.id}>{m.meetingNumber} - {m.title}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -201,7 +250,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                 <select
                   value={approvalStatus}
                   onChange={(e) => setApprovalStatus(e.target.value as ResolutionApprovalStatus)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold"
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold text-teal-900"
                 >
                   <option value="APPROVED">مصوب و ابلاغ جهت اجرا (Approved)</option>
                   <option value="CONDITIONAL_APPROVED">مصوب مشروط (Conditional)</option>
@@ -211,14 +260,16 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">عنوان موضوع مصوبه *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  عنوان موضوع مصوبه <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
                   value={topicTitle}
                   onChange={(e) => setTopicTitle(e.target.value)}
                   placeholder="مثال: استقرار زیرساخت احراز هویت مرکزی (SSO) سازمانی"
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium"
                 />
               </div>
 
@@ -275,51 +326,52 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                   />
                 </div>
 
+                {/* Responsible User Select */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">مسئول اصلی پیگیری و اقدام (Assignee)</label>
                   <select
                     value={mainResponsibleUserId}
                     onChange={(e) => setMainResponsibleUserId(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold text-teal-900"
                   >
-                    {mockUsers.map((u) => (
-                      <option key={u.id} value={u.id}>{u.fullName} ({u.title})</option>
+                    {availableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.fullName} ({u.title})
+                      </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Responsible Department - Auto-filled & Locked (Requirement 8) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>واحد سازمانی مجری</span>
+                    <span className="text-[10px] text-teal-800 font-bold flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      تکمیل خودکار بر اساس مسئول
+                    </span>
+                  </label>
+                  <div className="w-full text-xs p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center gap-2 cursor-not-allowed">
+                    <Building2 className="w-4 h-4 text-teal-700 shrink-0" />
+                    <span className="truncate">{currentResponsibleDept.name}</span>
+                  </div>
+                </div>
+
+                {/* Date Pickers for Assigned Date and Deadline (Requirement 5) */}
+                <div>
+                  <PersianDatePicker
+                    label="تاریخ ابلاغ مصوبه"
+                    value={assignedDateJalali}
+                    onChange={setAssignedDateJalali}
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">واحد سازمانی مجری</label>
-                  <select
-                    value={responsibleDepartmentId}
-                    onChange={(e) => setResponsibleDepartmentId(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                  >
-                    {mockDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">تاریخ ابلاغ</label>
-                    <input
-                      type="text"
-                      value={assignedDateJalali}
-                      onChange={(e) => setAssignedDateJalali(e.target.value)}
-                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">مهلت اقدام (Deadline)</label>
-                    <input
-                      type="text"
-                      value={deadlineJalali}
-                      onChange={(e) => setDeadlineJalali(e.target.value)}
-                      className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
-                    />
-                  </div>
+                  <PersianDatePicker
+                    label="مهلت اقدام (Deadline)"
+                    value={deadlineJalali}
+                    onChange={setDeadlineJalali}
+                  />
                 </div>
 
                 <div>
@@ -339,17 +391,17 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
             </div>
           )}
 
-          {/* Verification Workflow Config (صحه‌گذاری مصوبه) */}
+          {/* Verification Workflow Config */}
           {approvalStatus === 'APPROVED' && (
-            <div className="p-4 bg-purple-50/50 border border-purple-200/80 rounded-2xl space-y-4">
+            <div className="p-4 bg-teal-50/60 border border-teal-200/80 rounded-2xl space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-purple-700" />
+                  <ShieldCheck className="w-5 h-5 text-teal-700" />
                   <div>
-                    <h4 className="text-xs font-extrabold text-purple-950">
+                    <h4 className="text-xs font-extrabold text-teal-950">
                       پیکربندی صحه‌گذاری و تاییدات نهایی (Verification Workflow)
                     </h4>
-                    <p className="text-[10px] text-purple-700">
+                    <p className="text-[10px] text-teal-700">
                       پس از اتمام کار توسط مجری، مصوبه در کارتابل افراد زیر جهت صحه‌گذاری قرار می‌گیرد.
                     </p>
                   </div>
@@ -360,9 +412,9 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                     type="checkbox"
                     checked={requiresVerification}
                     onChange={(e) => setRequiresVerification(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 rounded-md focus:ring-purple-500"
+                    className="w-4 h-4 text-teal-700 rounded-md focus:ring-teal-500 cursor-pointer"
                   />
-                  <span className="text-xs font-bold text-purple-900">نیاز به صحه‌گذاری دارد</span>
+                  <span className="text-xs font-bold text-teal-900">نیاز به صحه‌گذاری دارد</span>
                 </label>
               </div>
 
@@ -390,54 +442,55 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                     </label>
                   </div>
 
-                  {/* Verification steps list */}
+                  {/* Steps list */}
                   <div className="space-y-2">
                     {verificationSteps.map((step) => (
                       <div
                         key={step.stepNumber}
-                        className="flex items-center justify-between p-2.5 bg-white border border-purple-200 rounded-xl text-xs"
+                        className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl text-xs"
                       >
                         <div className="flex items-center gap-2.5">
-                          <span className="w-5 h-5 rounded-full bg-purple-700 text-white font-bold flex items-center justify-center text-[10px]">
+                          <span className="w-5 h-5 rounded-full bg-teal-800 text-white font-bold flex items-center justify-center text-[10px]">
                             {step.stepNumber}
                           </span>
                           <div>
-                            <div className="font-bold text-slate-800">{step.approverName}</div>
-                            <div className="text-[10px] text-slate-500">{step.approverRole}</div>
+                            <span className="font-bold text-slate-800">{step.approverName}</span>
+                            <span className="text-[11px] text-slate-500 mr-2">({step.approverRole})</span>
                           </div>
                         </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVerificationStep(step.stepNumber)}
-                          className="text-slate-400 hover:text-rose-600 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {verificationSteps.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveVerificationStep(step.stepNumber)}
+                            className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
 
-                  {/* Add step */}
+                  {/* Add step control */}
                   <div className="flex items-center gap-2 pt-1">
                     <select
                       value={newStepApproverId}
                       onChange={(e) => setNewStepApproverId(e.target.value)}
-                      className="flex-1 text-xs p-2 bg-white border border-purple-200 rounded-xl"
+                      className="text-xs p-2 bg-white border border-slate-200 rounded-xl flex-1 focus:ring-2 focus:ring-teal-500"
                     >
-                      {mockUsers.map((u) => (
+                      {availableUsers.map((u) => (
                         <option key={u.id} value={u.id}>
-                          افزودن {u.fullName} ({u.title})
+                          {u.fullName} - {u.title}
                         </option>
                       ))}
                     </select>
                     <button
                       type="button"
                       onClick={handleAddVerificationStep}
-                      className="py-2 px-3 bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl flex items-center gap-1 shrink-0"
+                      className="px-3 py-2 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer shadow-2xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>افزودن مرحله تایید</span>
+                      <span>افزودن صحه‌گذار</span>
                     </button>
                   </div>
                 </div>
@@ -445,21 +498,21 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
             </div>
           )}
 
-          {/* Footer Submit */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          {/* Submit */}
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer"
             >
-              {isSubmitting ? 'در حال ثبت...' : 'ثبت و ابلاغ مصوبه'}
+              {isSubmitting ? 'در حال ثبت مصوبه...' : 'تایید نهایی و ابلاغ مصوبه'}
             </button>
           </div>
         </form>

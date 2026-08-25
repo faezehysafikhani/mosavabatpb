@@ -44,9 +44,29 @@ export type UserRole =
   | 'EXPERT_ASSIGNEE'    // کارشناس مسئول اجرا
   | 'AUDITOR';           // بازرس و ناظر سازمانی
 
+export type PermissionKey =
+  | 'VIEW_DASHBOARD'
+  | 'VIEW_MEETINGS'
+  | 'CREATE_MEETING'
+  | 'EDIT_MEETING'
+  | 'DELETE_MEETING'
+  | 'CREATE_RESOLUTION'
+  | 'VIEW_RESOLUTIONS'
+  | 'EDIT_RESOLUTION'
+  | 'VIEW_TASKS'
+  | 'VIEW_APPROVALS'
+  | 'APPROVE_RESOLUTION'
+  | 'REJECT_RESOLUTION'
+  | 'VIEW_REPORTS'
+  | 'MANAGE_USERS'
+  | 'CREATE_USER';
+
 export interface User {
   id: string;
   nationalCode: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
   fullName: string;
   title: string;          // سمت سازمانی
   email: string;
@@ -214,6 +234,8 @@ export interface Resolution {
   meetingId: string;
   meetingTitle: string;
   meetingNumber: string;
+  agendaItemId?: string;       // شناسه بند دستور جلسه مرجع
+  agendaItemTitle?: string;    // عنوان موضوع دستور جلسه مرجع
   topicTitle: string;          // عنوان موضوع
   proposerName: string;        // پیشنهاددهنده
   proposerDepartment: string;  // سازمان / واحد پیشنهاددهنده

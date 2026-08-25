@@ -1,82 +1,203 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Layers, ShieldCheck, UserCheck, CheckCircle2, Lock, ArrowLeft, X } from 'lucide-react';
-import { mockUsers } from '../../mock/data';
+import { ShieldCheck, UserCheck, CheckCircle2, Lock, ArrowLeft, X, User, KeyRound, Sparkles } from 'lucide-react';
+import { UserRole } from '../../types';
+import { PostBankEmblem } from '../../components/common/PostBankLogo';
 
 export const LoginModal: React.FC = () => {
-  const { isLoginModalOpen, setIsLoginModalOpen, setCurrentUser, currentUser, showToast } = useApp();
-  const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
+  const { isLoginModalOpen, setIsLoginModalOpen, availableUsers, login, currentUser, showToast } = useApp();
+  
+  const [activeTab, setActiveTab] = useState<'QUICK_ROLE' | 'CREDENTIALS'>('QUICK_ROLE');
+  const [usernameInput, setUsernameInput] = useState('admin');
+  const [passwordInput, setPasswordInput] = useState('******');
+  const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id || 'user-admin');
 
   if (!isLoginModalOpen) return null;
 
-  const handleLogin = (userId: string) => {
-    const user = mockUsers.find((u) => u.id === userId);
-    if (user) {
-      setCurrentUser(user);
+  const handleCredentialsLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usernameInput.trim()) {
+      showToast('خطا', 'لطفاً نام کاربری را وارد کنید.', 'error');
+      return;
+    }
+    const success = login(usernameInput.trim(), passwordInput);
+    if (success) {
       setIsLoginModalOpen(false);
-      showToast('ورود موفق', `به عنوان ${user.fullName} (${user.title}) وارد سامانه شدید.`, 'success');
+    }
+  };
+
+  const handleQuickRoleLogin = (userId: string) => {
+    const success = login(userId);
+    if (success) {
+      setIsLoginModalOpen(false);
+    }
+  };
+
+  const getRoleBadge = (role: UserRole) => {
+    switch (role) {
+      case 'ADMIN':
+        return { label: 'مدیر ارشد سیستم (دسترسی کامل)', bg: 'bg-rose-50 text-rose-700 border-rose-200' };
+      case 'CEO':
+        return { label: 'رئیس شورا / مدیرعامل', bg: 'bg-amber-50 text-amber-700 border-amber-200' };
+      case 'SECRETARY':
+        return { label: 'دبیر جلسات و مصوبات', bg: 'bg-blue-50 text-blue-700 border-blue-200' };
+      case 'DEPT_MANAGER':
+        return { label: 'مدیر واحد / صحه‌گذار', bg: 'bg-teal-50 text-teal-700 border-teal-200' };
+      case 'EXPERT_ASSIGNEE':
+        return { label: 'کارشناس مسئول اجرا', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+      default:
+        return { label: 'کاربر سازمانی', bg: 'bg-slate-50 text-slate-700 border-slate-200' };
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-6 text-center relative">
+        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-5 text-center relative shrink-0">
           <button
             onClick={() => setIsLoginModalOpen(false)}
-            className="absolute top-4 left-4 text-teal-200 hover:text-white p-1 rounded-lg"
+            className="absolute top-4 left-4 text-teal-200 hover:text-white p-1 rounded-lg hover:bg-teal-800"
           >
             <X className="w-5 h-5" />
           </button>
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-400 to-emerald-300 flex items-center justify-center text-slate-950 font-bold mx-auto mb-3 shadow-md">
-            <Layers className="w-6 h-6 text-teal-950" />
+          <div className="flex justify-center mb-2">
+            <PostBankEmblem size={44} />
           </div>
-          <h2 className="text-base font-extrabold text-white">ورود به سامانه مدیریت جلسات و مصوبات</h2>
-          <p className="text-xs text-teal-200 mt-1">احراز هویت سازمانی و انتخاب نقش جهت تست سناریوهای دسترسی</p>
+          <div className="flex items-center justify-center gap-1.5 mb-0.5">
+            <span className="text-sm font-black text-[#ff5260]">پست بانک ایران</span>
+          </div>
+          <h2 className="text-base font-extrabold text-white">ورود و مدیریت نشست کاربری</h2>
+          <p className="text-xs text-teal-200 mt-0.5">سامانه جامع جلسات، پیگیری مصوبات و صحه‌گذاری</p>
         </div>
 
-        {/* Roles list */}
-        <div className="p-5 space-y-4">
-          <div className="text-xs font-bold text-slate-700">یک هویت سازمانی را جهت ورود انتخاب فرمایید:</div>
-
-          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-            {mockUsers.slice(0, 6).map((user) => (
-              <div
-                key={user.id}
-                onClick={() => setSelectedUserId(user.id)}
-                className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                  selectedUserId === user.id
-                    ? 'border-teal-500 bg-teal-50/80 ring-2 ring-teal-400/30'
-                    : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-teal-700 text-white flex items-center justify-center font-bold text-xs">
-                    {user.fullName.split(' ')[0][0]}
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">{user.fullName}</div>
-                    <div className="text-[11px] text-slate-500">{user.title}</div>
-                    <div className="text-[10px] text-teal-700 font-medium">{user.departmentName}</div>
-                  </div>
-                </div>
-
-                {selectedUserId === user.id && (
-                  <CheckCircle2 className="w-5 h-5 text-teal-600 shrink-0" />
-                )}
-              </div>
-            ))}
-          </div>
-
+        {/* Tab switcher */}
+        <div className="flex border-b border-slate-200 bg-slate-50 p-1.5 gap-1 text-xs font-bold shrink-0">
           <button
-            onClick={() => handleLogin(selectedUserId)}
-            className="w-full bg-gradient-to-r from-teal-800 to-teal-700 hover:from-teal-700 hover:to-teal-600 text-white font-bold text-xs py-3 px-4 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
+            type="button"
+            onClick={() => setActiveTab('QUICK_ROLE')}
+            className={`flex-1 py-2 rounded-xl transition-all ${
+              activeTab === 'QUICK_ROLE'
+                ? 'bg-white text-teal-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
           >
-            <Lock className="w-4 h-4" />
-            <span>تایید هویت و ورود به پیشخوان</span>
+            انتخاب سریع نقش (تست سناریوها)
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('CREDENTIALS')}
+            className={`flex-1 py-2 rounded-xl transition-all ${
+              activeTab === 'CREDENTIALS'
+                ? 'bg-white text-teal-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            ورود با نام کاربری و رمز
           </button>
         </div>
+
+        {/* Tab 1: Quick Role Selector */}
+        {activeTab === 'QUICK_ROLE' && (
+          <div className="p-5 overflow-y-auto space-y-3 flex-1">
+            <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+              <span>هویت سازمانی مورد نظر را انتخاب نمایید:</span>
+              <span className="text-[11px] text-slate-400">تغییر بلادرنگ سطح دسترسی</span>
+            </div>
+
+            <div className="space-y-2">
+              {availableUsers.slice(0, 7).map((user) => {
+                const badge = getRoleBadge(user.role);
+                const isSelected = selectedUserId === user.id;
+
+                return (
+                  <div
+                    key={user.id}
+                    onClick={() => {
+                      setSelectedUserId(user.id);
+                      handleQuickRoleLogin(user.id);
+                    }}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                      isSelected
+                        ? 'border-teal-500 bg-teal-50/80 ring-2 ring-teal-400/30'
+                        : 'border-slate-200 hover:border-teal-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-teal-800 text-white flex items-center justify-center font-bold text-xs">
+                        {user.fullName.split(' ')[0][0]}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">{user.fullName}</div>
+                        <div className="text-[11px] text-slate-500">{user.title}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${badge.bg}`}>
+                            {badge.label}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-teal-700 font-bold">
+                      <span>ورود</span>
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Manual Credentials */}
+        {activeTab === 'CREDENTIALS' && (
+          <form onSubmit={handleCredentialsLogin} className="p-6 space-y-4 flex-1">
+            <div className="p-3 bg-teal-50 rounded-2xl border border-teal-200/70 text-xs text-teal-900 leading-relaxed">
+              <span className="font-bold block mb-1">راهنمای حساب‌های کاربری تستی:</span>
+              نام‌های کاربری نمونه: <code className="font-bold text-teal-800">admin</code> (مدیر سیستم), <code className="font-bold text-teal-800">rostami</code> (مدیرعامل), <code className="font-bold text-teal-800">hosseini</code> (مدیر فناوری), <code className="font-bold text-teal-800">sadeghi</code> (دبیر), <code className="font-bold text-teal-800">niknam</code> (کارشناس)
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">نام کاربری (Username)</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  required
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="admin"
+                  className="w-full text-xs p-3 pr-9 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono font-bold"
+                  dir="ltr"
+                />
+                <User className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">رمز عبور (Password)</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  required
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="••••••"
+                  className="w-full text-xs p-3 pr-9 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-mono"
+                  dir="ltr"
+                />
+                <KeyRound className="w-4 h-4 text-slate-400 absolute right-3 top-3.5" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
+            >
+              <Lock className="w-4 h-4" />
+              <span>تایید هویت و ورود به سامانه</span>
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

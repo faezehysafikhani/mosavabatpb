@@ -4,16 +4,50 @@
   * {
     font-family: 'Vazirmatn', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
+
+  /* Force pure white background in Light Mode without any dark leakage */
+  html {
+    background-color: #ffffff !important;
+    color: #0f172a;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a;
+    min-height: 100vh;
+  }
+
+  :root:not(.dark),
+  html:not(.dark),
+  html:not(.dark) body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    background-color: #020617 !important;
+    color: #f8fafc;
+  }
+
+  html.dark body {
+    background-color: #020617 !important;
+    color: #f8fafc;
+  }
 }
 
 /* Custom smooth scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -21,8 +55,61 @@
   border-radius: 4px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Dark mode fallback overrides for standard light classes */
+.dark .bg-white {
+  background-color: #0f172a !important;
+  color: #f8fafc;
+}
+
+.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+  border-color: #334155 !important;
+}
+
+.dark .text-slate-800,
+.dark .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark select,
+.dark input[type="text"],
+.dark input[type="search"],
+.dark textarea {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
 }
 
 /* Number display utility */

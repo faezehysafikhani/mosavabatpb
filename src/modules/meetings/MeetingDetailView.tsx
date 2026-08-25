@@ -17,7 +17,9 @@ import {
   Building,
   UserCheck,
   Layers,
-  ChevronLeft
+  ChevronLeft,
+  FileCheck2,
+  ExternalLink
 } from 'lucide-react';
 import { toPersianDigits, getMeetingTypeLabel, getMeetingStatusMeta, getResolutionExecutionMeta, getPriorityMeta } from '../../utils/formatters';
 import { AttachmentList } from '../../components/common/AttachmentList';
@@ -28,12 +30,12 @@ interface MeetingDetailViewProps {
   onOpenCreateResolution?: () => void;
 }
 
-export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId, onOpenCreateResolution }) => {
-  const { navigateTo, showToast, refreshTrigger } = useApp();
+export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId }) => {
+  const { navigateTo, showToast, refreshTrigger, openCreateResolutionModal } = useApp();
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
-  const [activeTab, setActiveTab] = useState<'RESOLUTIONS' | 'AGENDAS' | 'MEMBERS' | 'ATTACHMENTS' | 'MINUTES_PRINT'>('RESOLUTIONS');
+  const [activeTab, setActiveTab] = useState<'AGENDAS' | 'RESOLUTIONS' | 'MEMBERS' | 'ATTACHMENTS' | 'MINUTES_PRINT'>('AGENDAS');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -68,6 +70,14 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
     }, 300);
   };
 
+  const handleRegisterResolutionForAgenda = (agendaId: string, agendaTitle: string) => {
+    openCreateResolutionModal({
+      meetingId: meeting?.id,
+      agendaItemId: agendaId,
+      topicTitle: agendaTitle,
+    });
+  };
+
   if (loading || !meeting) {
     return (
       <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
@@ -85,7 +95,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
       <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => navigateTo('meetings')}
-          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-teal-800 transition-colors"
+          className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-teal-800 transition-colors cursor-pointer"
         >
           <ArrowRight className="w-4 h-4" />
           <span>بازگشت به لیست جلسات</span>
@@ -94,15 +104,15 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
         <div className="flex items-center gap-2">
           <button
             onClick={handlePrintMinutes}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-xl border border-slate-200 transition-colors"
+            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-xl border border-slate-200 transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4" />
             <span>چاپ صورتجلسه رسمی</span>
           </button>
 
           <button
-            onClick={() => navigateTo('resolutions')}
-            className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors"
+            onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
+            className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>ثبت مصوبه جدید برای این جلسه</span>
@@ -164,7 +174,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
           <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
             <div className="text-[10px] font-bold text-slate-400 mb-1 flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5 text-teal-600" />
-              <span>محل برگزاری</span>
+              <span>مکان جلسه</span>
             </div>
             <div className="text-xs font-extrabold text-slate-800 truncate" title={meeting.location}>{meeting.location}</div>
           </div>
@@ -179,23 +189,11 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
         </div>
       </div>
 
-      {/* Tabs Menu */}
+      {/* Tabs Menu - Tab 1 is "دستور جلسه و مذاکرات" */}
       <div className="flex border-b border-slate-200 bg-white rounded-2xl p-1.5 shadow-xs gap-1.5 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('RESOLUTIONS')}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 ${
-            activeTab === 'RESOLUTIONS'
-              ? 'bg-teal-800 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>مصوبات جلسه ({toPersianDigits(resolutions.length)})</span>
-        </button>
-
-        <button
           onClick={() => setActiveTab('AGENDAS')}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
             activeTab === 'AGENDAS'
               ? 'bg-teal-800 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -206,8 +204,20 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
         </button>
 
         <button
+          onClick={() => setActiveTab('RESOLUTIONS')}
+          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+            activeTab === 'RESOLUTIONS'
+              ? 'bg-teal-800 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>مصوبات جلسه ({toPersianDigits(resolutions.length)})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('MEMBERS')}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
             activeTab === 'MEMBERS'
               ? 'bg-teal-800 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -219,7 +229,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
 
         <button
           onClick={() => setActiveTab('ATTACHMENTS')}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
             activeTab === 'ATTACHMENTS'
               ? 'bg-teal-800 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -231,7 +241,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
 
         <button
           onClick={() => setActiveTab('MINUTES_PRINT')}
-          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 ${
+          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
             activeTab === 'MINUTES_PRINT'
               ? 'bg-teal-800 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
@@ -242,7 +252,98 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
         </button>
       </div>
 
-      {/* Tab 1: Resolutions inside meeting */}
+      {/* Tab 1: Agendas & Discussions with "ثبت مصوبه" button per agenda item (Requirement 9) */}
+      {activeTab === 'AGENDAS' && (
+        <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-teal-600"></span>
+                بندهای دستور جلسه، شرح مذاکرات و صدور مستقیم مصوبه
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                شما می‌توانید در کنار هر بند دستور جلسه، اقدام به ثبت مصوبه متناظر با آن نمایید.
+              </p>
+            </div>
+            <span className="text-xs text-slate-400 font-bold">
+              تعداد بندها: {toPersianDigits(meeting.agendaItems.length)}
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {meeting.agendaItems.map((ag) => {
+              const relatedResolutions = resolutions.filter(
+                (r) => r.agendaItemId === ag.id || r.topicTitle.toLowerCase().includes(ag.title.toLowerCase())
+              );
+
+              return (
+                <div
+                  key={ag.id}
+                  className="p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3 hover:border-teal-300 transition-all"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-full bg-teal-800 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        {toPersianDigits(ag.rowNumber)}
+                      </span>
+                      <div>
+                        <h4 className="text-sm font-extrabold text-slate-900">{ag.title}</h4>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          ارائه‌دهنده: <strong className="text-teal-900">{ag.presenterName || ag.presenter}</strong> | 
+                          مدت زمان: {toPersianDigits(ag.allocatedMinutes)} دقیقه
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Prominent Button: ثبت مصوبه برای این بند (Requirement 9) */}
+                    <button
+                      onClick={() => handleRegisterResolutionForAgenda(ag.id, ag.title)}
+                      className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition-all cursor-pointer"
+                    >
+                      <FileCheck2 className="w-4 h-4" />
+                      <span>ثبت مصوبه برای این بند</span>
+                    </button>
+                  </div>
+
+                  {ag.outcomeNotes && (
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                      <span className="font-bold text-teal-900 block mb-1">شرح مذاکرات و نتایج بررسی:</span>
+                      {ag.outcomeNotes}
+                    </div>
+                  )}
+
+                  {/* Linked Resolutions for this Agenda */}
+                  {relatedResolutions.length > 0 && (
+                    <div className="pt-2 border-t border-slate-200/70">
+                      <div className="text-[11px] font-bold text-teal-900 mb-1.5 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+                        <span>مصوبات صادرشده برای این بند ({toPersianDigits(relatedResolutions.length)} مورد):</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {relatedResolutions.map((r) => (
+                          <span
+                            key={r.id}
+                            onClick={() => {
+                              setActiveTab('RESOLUTIONS');
+                            }}
+                            className="inline-flex items-center gap-1.5 bg-white border border-teal-300 text-teal-900 text-xs font-bold py-1 px-3 rounded-xl cursor-pointer hover:bg-teal-50 shadow-2xs"
+                          >
+                            <span>{r.resolutionNumber}</span>
+                            <span className="text-[11px] text-slate-500 truncate max-w-xs">({r.topicTitle})</span>
+                            <ExternalLink className="w-3 h-3 text-teal-600" />
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 2: Resolutions */}
       {activeTab === 'RESOLUTIONS' && (
         <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -250,14 +351,21 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
               <span className="w-2 h-2 rounded-full bg-teal-600"></span>
               مصوبات مصوب این جلسه
             </h3>
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-slate-400 font-bold">
               مجموعاً {toPersianDigits(resolutions.length)} مصوبه ثبت شده است.
             </span>
           </div>
 
           {resolutions.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-xs">
-              هنوز هیچ مصوبه‌ای برای این جلسه ثبت نشده است.
+            <div className="text-center py-10 text-slate-400 text-xs space-y-2">
+              <p>هنوز هیچ مصوبه‌ای برای این جلسه ثبت نشده است.</p>
+              <button
+                onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
+                className="inline-flex items-center gap-1.5 text-teal-800 font-bold text-xs hover:underline cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>اولین مصوبه را ثبت فرمایید</span>
+              </button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -303,7 +411,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
                         مهلت اجرا: <strong className="text-slate-700">{toPersianDigits(res.deadlineJalali || '—')}</strong>
                       </div>
                       {res.verificationConfig?.requiresVerification && (
-                        <div className="text-purple-700 font-bold flex items-center gap-1 mr-auto bg-purple-50 px-2 py-0.5 rounded-md">
+                        <div className="text-teal-800 font-bold flex items-center gap-1 mr-auto bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
                           <ShieldCheck className="w-3.5 h-3.5" />
                           <span>نیازمند صحه‌گذاری ({toPersianDigits(res.verificationConfig.steps.length)} مرحله)</span>
                         </div>
@@ -314,44 +422,6 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
               })}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Tab 2: Agendas */}
-      {activeTab === 'AGENDAS' && (
-        <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
-          <h3 className="text-xs font-extrabold text-slate-800 border-b border-slate-100 pb-3">
-            بندهای دستور جلسه و شرح مذاکرات
-          </h3>
-
-          <div className="space-y-3">
-            {meeting.agendaItems.map((ag) => (
-              <div key={ag.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-teal-800 text-white font-bold text-xs flex items-center justify-center">
-                      {toPersianDigits(ag.rowNumber)}
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-800">{ag.title}</h4>
-                  </div>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    زمان تخصیص‌یافته: {toPersianDigits(ag.allocatedMinutes)} دقیقه
-                  </span>
-                </div>
-
-                <div className="text-xs text-slate-600 pr-8">
-                  ارائه‌دهنده و گزارش‌گر بند: <strong className="text-slate-800">{ag.presenterName}</strong>
-                </div>
-
-                {ag.outcomeNotes && (
-                  <div className="mr-8 p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700">
-                    <span className="font-bold text-teal-800 block mb-1">نتیجه مذاکرات و تصمیمات:</span>
-                    {ag.outcomeNotes}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -368,15 +438,13 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
                 key={member.userId}
                 className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3"
               >
-                <div className="w-10 h-10 rounded-full bg-teal-700 text-white font-bold text-xs flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-teal-800 text-white font-bold text-xs flex items-center justify-center">
                   {member.fullName[0]}
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-800">{member.fullName}</div>
                   <div className="text-[11px] text-slate-500">{member.organizationPosition}</div>
-                  <div className="text-[10px] text-teal-700 font-semibold mt-0.5">
-                    {member.roleInMeeting === 'CHAIRMAN' ? 'رئیس جلسه' : member.roleInMeeting === 'SECRETARY' ? 'دبیر جلسه' : 'عضو جلسه'}
-                  </div>
+                  <div className="text-[10px] text-teal-800 font-medium">{member.departmentName}</div>
                 </div>
               </div>
             ))}
@@ -386,75 +454,43 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId,
 
       {/* Tab 4: Attachments */}
       {activeTab === 'ATTACHMENTS' && (
-        <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
-          <h3 className="text-xs font-extrabold text-slate-800 border-b border-slate-100 pb-3">
-            مستندات و فایل‌های پیوست جلسه
-          </h3>
-          <AttachmentList
-            attachments={meeting.attachments}
-            canUpload={true}
-            onAddFiles={(newFiles) => {
-              setMeeting({
-                ...meeting,
-                attachments: [...meeting.attachments, ...newFiles],
-              });
-            }}
-          />
+        <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90">
+          <AttachmentList attachments={meeting.attachments} />
         </div>
       )}
 
-      {/* Tab 5: Official Printable Minutes (صورتجلسه رسمی سازمان) */}
+      {/* Tab 5: Official Minutes Preview & Print */}
       {activeTab === 'MINUTES_PRINT' && (
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-300 print:border-none print:shadow-none space-y-6 text-slate-900">
-          <div className="text-center border-b-2 border-slate-800 pb-4 space-y-1">
-            <div className="text-sm font-bold text-slate-600">جمهوری اسلامی ایران</div>
-            <h1 className="text-lg font-black text-slate-900">صورتجلسه رسمی {meeting.title}</h1>
-            <div className="text-xs font-bold text-slate-500">شماره ثبت صورتجلسه: {meeting.meetingNumber}</div>
+        <div className="bg-white rounded-3xl p-8 shadow-xs border border-slate-200/90 space-y-6 text-slate-900 printable-minutes">
+          <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
+            <h2 className="text-base font-black">صورتجلسه رسمی مصوبات سازمان</h2>
+            <p className="text-xs font-bold">شماره جلسه: {meeting.meetingNumber} | تاریخ: {toPersianDigits(meeting.dateJalali)}</p>
           </div>
 
-          <div className="grid grid-cols-2 text-xs border border-slate-300 divide-x divide-x-reverse divide-slate-300 rounded-xl overflow-hidden">
-            <div className="p-3 space-y-1">
-              <div><strong>تاریخ:</strong> {toPersianDigits(meeting.dateJalali)}</div>
-              <div><strong>زمان:</strong> {toPersianDigits(meeting.startTime)} الی {toPersianDigits(meeting.endTime)}</div>
-              <div><strong>محل:</strong> {meeting.location}</div>
-            </div>
-            <div className="p-3 space-y-1">
-              <div><strong>رئیس جلسه:</strong> {meeting.organizerName}</div>
-              <div><strong>دبیر جلسه:</strong> {meeting.secretaryName}</div>
-              <div><strong>واحد برگزارکننده:</strong> {meeting.departmentName}</div>
-            </div>
+          <div className="text-xs space-y-2">
+            <p><strong>عنوان جلسه:</strong> {meeting.title}</p>
+            <p><strong>مکان جلسه:</strong> {meeting.location}</p>
+            <p><strong>زمان برگزاری:</strong> از ساعت {toPersianDigits(meeting.startTime)} لغایت {toPersianDigits(meeting.endTime)}</p>
+            <p><strong>دبیر جلسه:</strong> {meeting.secretaryName}</p>
           </div>
 
-          <div className="space-y-3">
-            <h3 className="text-xs font-black bg-slate-100 p-2 rounded-lg border border-slate-200">
-              خلاصه مصوبات تصویب‌شده
-            </h3>
-            <div className="space-y-2">
-              {resolutions.map((res, i) => (
-                <div key={res.id} className="p-3 border border-slate-200 rounded-xl text-xs space-y-1">
-                  <div className="font-bold text-slate-800">
-                    بند {toPersianDigits(i + 1)}: {res.topicTitle} ({res.resolutionNumber})
-                  </div>
-                  <div className="text-slate-600">{res.executionDescription || res.requestDescription}</div>
-                  <div className="text-[11px] text-slate-500 font-medium">
-                    مسئول اجرا: {res.mainResponsibleName} | مهلت اقدام: {toPersianDigits(res.deadlineJalali || '—')}
-                  </div>
+          <div className="space-y-3 pt-2">
+            <h4 className="text-xs font-black border-b border-slate-300 pb-1">مصوبات و تصمیمات اتخاذ شده:</h4>
+            {resolutions.map((res, i) => (
+              <div key={res.id} className="text-xs p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="font-bold">بند {toPersianDigits(i + 1)}: {res.topicTitle} ({res.resolutionNumber})</div>
+                <div className="text-slate-700">{res.executionDescription || res.requestDescription}</div>
+                <div className="text-[11px] text-slate-500">
+                  مسئول اجرا: {res.mainResponsibleName} ({res.responsibleDepartmentName}) | مهلت: {toPersianDigits(res.deadlineJalali || '—')}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
-          {/* Signatures box */}
-          <div className="pt-6 border-t border-slate-200">
-            <h4 className="text-xs font-bold text-slate-700 mb-4 text-center">امضای اعضا و حاضرین جلسه:</h4>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 text-center text-xs">
-              {meeting.members.map((m) => (
-                <div key={m.userId} className="p-3 border border-dashed border-slate-300 rounded-xl h-24 flex flex-col justify-between">
-                  <div className="font-bold text-slate-800">{m.fullName}</div>
-                  <div className="text-[10px] text-slate-400">امضا دیجیتال / دستی</div>
-                </div>
-              ))}
-            </div>
+          <div className="pt-8 border-t border-slate-200 flex justify-between items-center text-xs font-bold">
+            <div>امضای رئیس جلسه</div>
+            <div>امضای دبیر جلسه</div>
+            <div>مهر و امضای اعضای حاضر</div>
           </div>
         </div>
       )}

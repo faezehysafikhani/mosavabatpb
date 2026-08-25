@@ -1,23 +1,17 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   LayoutDashboard, 
   Calendar, 
   FileCheck2, 
-  Inbox, 
   CheckSquare, 
-  BarChart3, 
   Users, 
-  Settings, 
-  ChevronDown, 
+  BookOpen, 
   ChevronLeft, 
   ChevronRight, 
-  PlusCircle, 
-  FolderKanban, 
   ShieldCheck,
-  Building2,
   FileSpreadsheet,
   Clock,
-  Sparkles
+  UserCheck
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
@@ -25,7 +19,6 @@ import { toPersianDigits } from '../../utils/formatters';
 interface NavGroup {
   id: string;
   title: string;
-  icon: React.ElementType;
   items: {
     route: AppRoute;
     title: string;
@@ -42,31 +35,14 @@ export const Sidebar: React.FC = () => {
     navigateTo, 
     isSidebarCollapsed, 
     toggleSidebar, 
-    setIsCreateMeetingOpen, 
-    setIsAiAssistantOpen,
-    currentUser
+    currentUser,
+    hasPermission
   } = useApp();
 
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    dashboards: true,
-    meetings_resolutions: true,
-    cartable: true,
-    reports: true,
-    settings: true,
-  });
-
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [groupId]: !prev[groupId],
-    }));
-  };
-
-  const navGroups: NavGroup[] = [
+  const allNavGroups: NavGroup[] = [
     {
       id: 'dashboards',
-      title: 'اصلی',
-      icon: LayoutDashboard,
+      title: 'پیشخوان',
       items: [
         {
           route: 'dashboard',
@@ -78,30 +54,23 @@ export const Sidebar: React.FC = () => {
     {
       id: 'meetings_resolutions',
       title: 'جلسات و مصوبات',
-      icon: FolderKanban,
       items: [
         {
-          route: 'meetings',
+          route: 'meetings' as AppRoute,
           title: 'مدیریت جلسات',
           icon: Calendar,
           badge: 15,
-          badgeColor: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+          badgeColor: 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800',
         },
         {
-          route: 'meetings',
-          title: 'ایجاد جلسه جدید',
-          icon: PlusCircle,
-          action: () => setIsCreateMeetingOpen(true),
-        },
-        {
-          route: 'resolutions',
-          title: 'مصوبات سازمانی',
+          route: 'resolutions' as AppRoute,
+          title: 'بانک مصوبات',
           icon: FileCheck2,
           badge: 12,
-          badgeColor: 'bg-blue-600 text-white',
+          badgeColor: 'bg-teal-700 text-white',
         },
         {
-          route: 'calendar',
+          route: 'calendar' as AppRoute,
           title: 'تقویم هوشمند',
           icon: Clock,
         },
@@ -109,185 +78,173 @@ export const Sidebar: React.FC = () => {
     },
     {
       id: 'cartable',
-      title: 'کارتابل‌ها',
-      icon: Inbox,
+      title: 'کارتابل و تکالیف',
       items: [
         {
-          route: 'tasks',
+          route: 'tasks' as AppRoute,
           title: 'وظایف ارجاعی من',
           icon: CheckSquare,
           badge: 4,
-          badgeColor: 'bg-red-500 text-white',
+          badgeColor: 'bg-rose-500 text-white',
         },
-        {
-          route: 'approvals',
-          title: 'کارتابل صحه‌گذاری',
-          icon: ShieldCheck,
-          badge: 12,
-          badgeColor: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-        },
+        ...(hasPermission('VIEW_APPROVALS') || currentUser.role === 'ADMIN' || currentUser.role === 'DEPT_MANAGER' || currentUser.role === 'CEO'
+          ? [
+              {
+                route: 'approvals' as AppRoute,
+                title: 'کارتابل صحه‌گذاری',
+                icon: ShieldCheck,
+                badge: 12,
+                badgeColor: 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800',
+              },
+            ]
+          : []),
       ],
     },
     {
-      id: 'reports',
-      title: 'گزارشات و پایش',
-      icon: BarChart3,
+      id: 'reports_system',
+      title: 'گزارش و راهنما',
       items: [
         {
-          route: 'reports',
-          title: 'گزارش عملکرد واحدها',
+          route: 'reports' as AppRoute,
+          title: 'گزارش عملکرد',
           icon: FileSpreadsheet,
         },
-      ],
-    },
-    {
-      id: 'settings',
-      title: 'تنظیمات',
-      icon: Settings,
-      items: [
+        ...(currentUser.role === 'ADMIN' || hasPermission('MANAGE_USERS')
+          ? [
+              {
+                route: 'users' as AppRoute,
+                title: 'مدیریت کاربران',
+                icon: Users,
+              },
+            ]
+          : []),
         {
-          route: 'users',
-          title: 'مدیریت کاربران و ساختار',
-          icon: Users,
-        },
-        {
-          route: 'settings',
-          title: 'تنظیمات و معماری سیستم',
-          icon: Building2,
+          route: 'guide' as AppRoute,
+          title: 'راهنمای کاربری سامانه',
+          icon: BookOpen,
+          badge: 7,
+          badgeColor: 'bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-[9px] border border-teal-200 dark:border-teal-800',
         },
       ],
     },
   ];
 
+  const navGroups = allNavGroups.filter((g) => g.items.length > 0);
+
   return (
     <aside
-      className={`bg-[#0f172a] text-slate-300 border-l border-slate-800 transition-all duration-300 flex flex-col shrink-0 z-30 ${
-        isSidebarCollapsed ? 'w-16' : 'w-64'
+      className={`bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-start shrink-0 z-30 h-full select-none shadow-xs ${
+        isSidebarCollapsed ? 'w-16' : 'w-60'
       }`}
     >
-      {/* Sidebar Header with Brand */}
-      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+      {/* User Info Box - Placed at the very TOP, above "پیشخوان" (Dashboard) */}
+      <div className="p-2 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
         {!isSidebarCollapsed ? (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-sm">
-              س
-            </div>
-            <div>
-              <span className="text-base font-bold text-white tracking-tight">سامانه مصوبات</span>
-              <p className="text-[10px] text-slate-400 font-medium">مدیریت جلسات و صحه‌گذاری</p>
-            </div>
-          </div>
-        ) : (
-          <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-sm mx-auto shadow-sm">
-            س
-          </div>
-        )}
-        <button
-          onClick={toggleSidebar}
-          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-          title={isSidebarCollapsed ? 'گسترش منو' : 'جمع کردن منو'}
-        >
-          {isSidebarCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-3">
-        {navGroups.map((group) => {
-          const GroupIcon = group.icon;
-          const isExpanded = expandedGroups[group.id];
-
-          return (
-            <div key={group.id} className="space-y-1">
-              {/* Group Header */}
-              {!isSidebarCollapsed ? (
-                <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                  <span>{group.title}</span>
-                </div>
-              ) : (
-                <div className="text-center py-1">
-                  <div className="w-7 h-7 rounded-lg bg-slate-800/60 text-slate-400 flex items-center justify-center mx-auto text-xs font-bold" title={group.title}>
-                    <GroupIcon className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-              )}
-
-              {/* Group Sub-items */}
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const ItemIcon = item.icon;
-                  const isActive = currentRoute === item.route && !item.action;
-
-                  return (
-                    <button
-                      key={item.title}
-                      onClick={() => {
-                        if (item.action) {
-                          item.action();
-                        } else {
-                          navigateTo(item.route);
-                        }
-                      }}
-                      title={item.title}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors cursor-pointer ${
-                        isActive
-                          ? 'bg-blue-600 text-white font-bold shadow-sm'
-                          : 'text-slate-300 hover:bg-slate-800/80 hover:text-white font-medium'
-                      } ${isSidebarCollapsed ? 'justify-center px-2 py-2.5' : ''}`}
-                    >
-                      <div className="flex items-center gap-2.5 truncate">
-                        <ItemIcon
-                          className={`w-4 h-4 shrink-0 ${
-                            isActive ? 'text-white' : 'text-slate-400'
-                          }`}
-                        />
-                        {!isSidebarCollapsed && (
-                          <span className="truncate">{item.title}</span>
-                        )}
-                      </div>
-
-                      {!isSidebarCollapsed && item.badge !== undefined && (
-                        <span
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                            item.badgeColor || 'bg-blue-600 text-white'
-                          }`}
-                        >
-                          {toPersianDigits(item.badge)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+          <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-teal-700 text-white flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden shadow-xs">
+                {currentUser.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{currentUser.fullName.slice(0, 2)}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100 truncate">{currentUser.fullName}</p>
+                <p className="text-[9px] text-teal-700 dark:text-teal-400 font-semibold truncate">{currentUser.title}</p>
               </div>
             </div>
-          );
-        })}
+            <button
+              onClick={toggleSidebar}
+              className="p-1 rounded-lg text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer shrink-0"
+              title="جمع کردن منو"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5 py-0.5">
+            <div 
+              className="w-8 h-8 rounded-lg bg-teal-700 text-white flex items-center justify-center text-[10px] font-bold shadow-xs cursor-pointer"
+              title={`${currentUser.fullName} - ${currentUser.title}`}
+              onClick={toggleSidebar}
+            >
+              {currentUser.fullName.slice(0, 2)}
+            </div>
+            <button
+              onClick={toggleSidebar}
+              className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-white transition-colors cursor-pointer"
+              title="گسترش منو"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Sidebar User Footer */}
-      {!isSidebarCollapsed ? (
-        <div className="p-3.5 border-t border-slate-800 bg-slate-900/80">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden">
-              {currentUser.avatarUrl ? (
-                <img src={currentUser.avatarUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
-              ) : (
-                <span>{currentUser.fullName.slice(0, 2)}</span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-white truncate">{currentUser.fullName}</p>
-              <p className="text-[10px] text-slate-400 truncate">{currentUser.title}</p>
+      {/* Navigation List - Super Compact & Smooth - Above fold with Zero Scroll */}
+      <div className="flex-1 py-1 px-2 space-y-1 overflow-hidden flex flex-col justify-start">
+        {navGroups.map((group) => (
+          <div key={group.id} className="space-y-0.5">
+            {/* Group Header */}
+            {!isSidebarCollapsed ? (
+              <div className="px-2 pt-1 pb-0.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                {group.title}
+              </div>
+            ) : (
+              <div className="h-1" />
+            )}
+
+            {/* Group Items */}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const ItemIcon = item.icon;
+                const isActive = (currentRoute === item.route || (item.route === 'guide' && currentRoute === 'settings')) && !item.action;
+
+                return (
+                  <button
+                    key={item.title}
+                    onClick={() => {
+                      if (item.action) {
+                        item.action();
+                      } else {
+                        navigateTo(item.route);
+                      }
+                    }}
+                    title={item.title}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-teal-800 text-white font-bold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-medium'
+                    } ${isSidebarCollapsed ? 'justify-center px-1 py-1.5' : ''}`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <ItemIcon
+                        className={`w-4 h-4 shrink-0 ${
+                          isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400'
+                        }`}
+                      />
+                      {!isSidebarCollapsed && (
+                        <span className="truncate text-[11px]">{item.title}</span>
+                      )}
+                    </div>
+
+                    {!isSidebarCollapsed && item.badge !== undefined && (
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full leading-tight ${
+                          item.badgeColor || 'bg-teal-700 text-white'
+                        }`}
+                      >
+                        {toPersianDigits(item.badge)}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="p-3 border-t border-slate-800 text-center">
-          <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-white mx-auto">
-            {currentUser.fullName.slice(0, 2)}
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
     </aside>
   );
 };

@@ -17,6 +17,8 @@ export interface CreateResolutionDto {
   meetingId: string;
   meetingTitle: string;
   meetingNumber: string;
+  agendaItemId?: string;
+  agendaItemTitle?: string;
   topicTitle: string;
   proposerName: string;
   proposerDepartment: string;
@@ -119,6 +121,8 @@ class MockResolutionService implements IResolutionService {
       meetingId: dto.meetingId,
       meetingTitle: dto.meetingTitle,
       meetingNumber: dto.meetingNumber,
+      agendaItemId: dto.agendaItemId,
+      agendaItemTitle: dto.agendaItemTitle,
       topicTitle: dto.topicTitle,
       proposerName: dto.proposerName,
       proposerDepartment: dto.proposerDepartment,

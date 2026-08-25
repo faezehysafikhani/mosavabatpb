@@ -64,10 +64,10 @@ export const ReportsView: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-100 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-teal-700" />
+          <h1 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-blue-600" />
             <span>گزارش جامع عملکرد و تحلیلی مصوبات</span>
           </h1>
           <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -78,26 +78,26 @@ export const ReportsView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-xl border border-slate-200 transition-colors"
+            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-3.5 h-3.5 text-slate-600" />
             <span>چاپ گزارش</span>
           </button>
 
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors"
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-full shadow-xs transition-colors cursor-pointer"
           >
-            <FileDown className="w-4 h-4" />
+            <FileDown className="w-3.5 h-3.5" />
             <span>خروجی فایل اکسل</span>
           </button>
         </div>
       </div>
 
       {/* Monthly Trend Line Chart */}
-      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
-        <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
-          <TrendingUp className="w-4 h-4 text-teal-700" />
+      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-100 space-y-4">
+        <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
+          <TrendingUp className="w-4 h-4 text-blue-600" />
           <span>روند ماهانه تشکیل جلسات و تحقق مصوبات سازمانی</span>
         </h3>
 
@@ -105,24 +105,24 @@ export const ReportsView: React.FC = () => {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthlyTrends}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
               <Tooltip formatter={(val) => [toPersianDigits(Number(val)), '']} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line type="monotone" dataKey="resolutionsCount" name="تعداد مصوبات صادره" stroke="#3b82f6" strokeWidth={3} />
-              <Line type="monotone" dataKey="completedResolutionsCount" name="مصوبات خاتمه‌یافته" stroke="#10b981" strokeWidth={3} />
-              <Line type="monotone" dataKey="meetingsCount" name="تعداد جلسات" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" />
+              <Line type="monotone" dataKey="resolutionsCount" name="تعداد مصوبات صادره" stroke="#2563eb" strokeWidth={2.5} />
+              <Line type="monotone" dataKey="completedResolutionsCount" name="مصوبات خاتمه‌یافته" stroke="#10b981" strokeWidth={2.5} />
+              <Line type="monotone" dataKey="meetingsCount" name="تعداد جلسات" stroke="#f59e0b" strokeWidth={2} strokeDasharray="4 4" />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Department Performance Table */}
-      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
+      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-100 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-teal-700" />
-            <h3 className="text-xs font-extrabold text-slate-800">ماتریس عملکرد واحدهای سازمانی در اجرای مصوبات</h3>
+            <Building2 className="w-4 h-4 text-blue-600" />
+            <h3 className="text-xs font-bold text-slate-800">ماتریس عملکرد واحدهای سازمانی در اجرای مصوبات</h3>
           </div>
         </div>
 
@@ -150,12 +150,12 @@ export const ReportsView: React.FC = () => {
                   <td className="py-3.5 px-3 text-center font-bold text-rose-600">{toPersianDigits(dept.overdue)}</td>
                   <td className="py-3.5 px-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${dept.completionRatePercent}%`,
-                            backgroundColor: dept.completionRatePercent >= 70 ? '#10b981' : dept.completionRatePercent >= 40 ? '#3b82f6' : '#f59e0b',
+                            backgroundColor: dept.completionRatePercent >= 70 ? '#10b981' : dept.completionRatePercent >= 40 ? '#2563eb' : '#f59e0b',
                           }}
                         ></div>
                       </div>

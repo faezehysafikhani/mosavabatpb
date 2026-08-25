@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, AppNotification } from '../types';
+import { User, AppNotification, PermissionKey } from '../types';
 import { mockUsers, mockNotifications } from '../mock/data';
 import { userService } from '../services/userService';
 
@@ -13,7 +13,8 @@ export type AppRoute =
   | 'reports'
   | 'calendar'
   | 'users'
-  | 'settings';
+  | 'settings'
+  | 'guide';
 
 interface ToastInfo {
   id: string;
@@ -22,10 +23,18 @@ interface ToastInfo {
   message: string;
 }
 
+export interface CreateResolutionModalState {
+  isOpen: boolean;
+  defaultMeetingId?: string;
+  defaultAgendaItemId?: string;
+  defaultTopicTitle?: string;
+}
+
 interface AppContextType {
   currentUser: User;
   setCurrentUser: (user: User) => void;
   availableUsers: User[];
+  addUser: (userData: Omit<User, 'id'>) => Promise<User>;
   currentRoute: AppRoute;
   navigateTo: (route: AppRoute, params?: { meetingId?: string; resolutionId?: string; taskId?: string }) => void;
   selectedMeetingId: string | null;
@@ -40,17 +49,30 @@ interface AppContextType {
   notifications: AppNotification[];
   unreadNotificationsCount: number;
   markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearAllNotifications: () => void;
   toasts: ToastInfo[];
   showToast: (title: string, message: string, type?: ToastInfo['type']) => void;
   removeToast: (id: string) => void;
   isCreateMeetingOpen: boolean;
   setIsCreateMeetingOpen: (open: boolean) => void;
+  createMeetingInitialDate: string;
+  openCreateMeetingModal: (defaultDate?: string) => void;
   isAiAssistantOpen: boolean;
   setIsAiAssistantOpen: (open: boolean) => void;
   isLoginModalOpen: boolean;
   setIsLoginModalOpen: (open: boolean) => void;
+  isAuthenticated: boolean;
+  login: (usernameOrId: string, password?: string) => boolean;
+  logout: () => void;
+  hasPermission: (permission: string) => boolean;
+  resolutionModalState: CreateResolutionModalState;
+  openCreateResolutionModal: (opts?: { meetingId?: string; agendaItemId?: string; topicTitle?: string }) => void;
+  closeCreateResolutionModal: () => void;
   refreshTrigger: number;
   triggerRefresh: () => void;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -59,6 +81,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Default to User-2 (مهندس حسینی - مدیر فناوری اطلاعات) or Admin
   const [currentUser, setCurrentUser] = useState<User>(mockUsers[1]);
   const [availableUsers, setAvailableUsers] = useState<User[]>(mockUsers);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [currentRoute, setCurrentRoute] = useState<AppRoute>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
@@ -67,9 +90,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
   const [toasts, setToasts] = useState<ToastInfo[]>([]);
   const [isCreateMeetingOpen, setIsCreateMeetingOpen] = useState<boolean>(false);
+  const [createMeetingInitialDate, setCreateMeetingInitialDate] = useState<string>('۱۴۰۳/۰۷/۰۵');
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [resolutionModalState, setResolutionModalState] = useState<CreateResolutionModalState>({
+    isOpen: false,
+  });
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  // Initialize Dark Mode from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('app-theme');
+    if (savedTheme === 'dark') {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      if (next) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('app-theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('app-theme', 'light');
+      }
+      return next;
+    });
+  };
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
@@ -93,6 +147,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    showToast('اعلان‌ها', 'تمامی اعلان‌ها به عنوان خوانده‌شده علامت‌گذاری شدند.', 'info');
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    showToast('اعلان‌ها', 'تمامی اعلان‌ها پاک شدند.', 'info');
+  };
+
   const unreadNotificationsCount = notifications.filter((n) => !n.isRead).length;
 
   const showToast = (title: string, message: string, type: ToastInfo['type'] = 'success') => {
@@ -108,12 +172,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const openCreateMeetingModal = (defaultDate?: string) => {
+    if (defaultDate) {
+      setCreateMeetingInitialDate(defaultDate);
+    }
+    setIsCreateMeetingOpen(true);
+  };
+
+  const hasPermission = (permission: string): boolean => {
+    if (!currentUser) return false;
+    // Item 1: My tasks should be visible and accessible to all users
+    if (permission === 'VIEW_TASKS') return true;
+    if (currentUser.role === 'ADMIN') return true;
+    if (currentUser.permissions?.includes('VIEW_ALL') || currentUser.permissions?.includes('APPROVE_ALL')) {
+      if (permission.startsWith('VIEW_')) return true;
+    }
+    return currentUser.permissions?.includes(permission) ?? false;
+  };
+
+  const login = (usernameOrId: string, password?: string): boolean => {
+    // Find user by id, username, or national code
+    const user = availableUsers.find(
+      (u) =>
+        u.id === usernameOrId ||
+        (u.username && u.username.toLowerCase() === usernameOrId.toLowerCase()) ||
+        u.nationalCode === usernameOrId ||
+        u.email.toLowerCase() === usernameOrId.toLowerCase()
+    );
+
+    if (user) {
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setIsLoginModalOpen(false);
+      navigateTo('dashboard');
+      showToast('ورود موفق', `خوش آمدید ${user.fullName} (${user.title})`, 'success');
+      return true;
+    }
+    // Fallback if not found: select first user
+    if (availableUsers.length > 0) {
+      setCurrentUser(availableUsers[0]);
+      setIsAuthenticated(true);
+      setIsLoginModalOpen(false);
+      navigateTo('dashboard');
+      showToast('ورود موفق', `ورود با هویت ${availableUsers[0].fullName}`, 'success');
+      return true;
+    }
+    showToast('خطای ورود', 'کاربر مورد نظر یافت نشد.', 'error');
+    return false;
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setIsLoginModalOpen(true);
+    showToast('خروج از سیستم', 'از حساب کاربری خارج شدید.', 'info');
+  };
+
+  const addUser = async (userData: Omit<User, 'id'>): Promise<User> => {
+    const res = await userService.createUser(userData);
+    const newUser = res.data;
+    setAvailableUsers((prev) => [newUser, ...prev]);
+    showToast('ثبت کاربر جدید', `کاربر "${newUser.fullName}" با موفقیت اضافه شد.`, 'success');
+    triggerRefresh();
+    return newUser;
+  };
+
+  const openCreateResolutionModal = (opts?: {
+    meetingId?: string;
+    agendaItemId?: string;
+    topicTitle?: string;
+  }) => {
+    setResolutionModalState({
+      isOpen: true,
+      defaultMeetingId: opts?.meetingId,
+      defaultAgendaItemId: opts?.agendaItemId,
+      defaultTopicTitle: opts?.topicTitle,
+    });
+  };
+
+  const closeCreateResolutionModal = () => {
+    setResolutionModalState({ isOpen: false });
+  };
+
   return (
     <AppContext.Provider
       value={{
         currentUser,
         setCurrentUser,
         availableUsers,
+        addUser,
         currentRoute,
         navigateTo,
         selectedMeetingId,
@@ -128,17 +274,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notifications,
         unreadNotificationsCount,
         markNotificationAsRead,
+        markAllNotificationsAsRead,
+        clearAllNotifications,
         toasts,
         showToast,
         removeToast,
         isCreateMeetingOpen,
         setIsCreateMeetingOpen,
+        createMeetingInitialDate,
+        openCreateMeetingModal,
         isAiAssistantOpen,
         setIsAiAssistantOpen,
         isLoginModalOpen,
         setIsLoginModalOpen,
+        isAuthenticated,
+        login,
+        logout,
+        hasPermission,
+        resolutionModalState,
+        openCreateResolutionModal,
+        closeCreateResolutionModal,
         refreshTrigger,
         triggerRefresh,
+        isDarkMode,
+        toggleDarkMode,
       }}
     >
       {children}

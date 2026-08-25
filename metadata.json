@@ -1,6 +1,6 @@
 {
   "name": "سامانه مدیریت جلسات و مصوبات سازمانی",
-  "description": "سامانه جامع مدیریت جلسات، پیگیری مصوبات، ارجاعات، کارتابل وظایف و صحه\u200cگذاری سازمانی",
+  "description": "سامانه جامع مدیریت جلسات، پیگیری مصوبات و صحه‌گذاری سازمانی پست بانک ایران",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

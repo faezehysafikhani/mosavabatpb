@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, 
   Search, 
@@ -14,10 +14,14 @@ import {
   Sparkles,
   ChevronDown,
   User as UserIcon,
-  ShieldAlert
+  ShieldAlert,
+  Check,
+  Trash2,
+  Inbox
 } from 'lucide-react';
-import { useApp } from '../../context/AppContext';
+import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
+import { PostBankEmblem } from '../common/PostBankLogo';
 
 export const Navbar: React.FC = () => {
   const { 
@@ -30,30 +34,62 @@ export const Navbar: React.FC = () => {
     notifications,
     unreadNotificationsCount,
     markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearAllNotifications,
     navigateTo,
     setIsAiAssistantOpen,
     setIsLoginModalOpen,
-    showToast
+    showToast,
+    isDarkMode,
+    toggleDarkMode
   } = useApp();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationTab, setNotificationTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-    showToast('حالت نمایش', isDarkMode ? 'حالت روز فعال شد' : 'حالت شب آزمایشی فعال شد', 'info');
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredNotifications = notifications.filter((n) => {
+    if (notificationTab === 'UNREAD') return !n.isRead;
+    return true;
+  });
+
+  const handleNotificationClick = (notif: typeof notifications[0]) => {
+    markNotificationAsRead(notif.id);
+    setShowNotifications(false);
+    
+    if (notif.targetRoute) {
+      const cleanRoute = notif.targetRoute.replace('/', '') as AppRoute;
+      navigateTo(cleanRoute);
+      showToast(notif.title, 'انتقال به بخش مربوطه انجام شد.', 'info');
+    }
   };
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-8 shrink-0 sticky top-0 z-40 shadow-xs">
+    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-40 shadow-xs select-none">
       <div className="w-full flex items-center justify-between gap-4">
         
-        {/* Right side: App Title & Toggle */}
+        {/* Right side: App Title & Toggle & Post Bank Iran Logo */}
         <div className="flex items-center gap-3">
           <button 
             onClick={toggleSidebar}
-            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-100 transition-colors cursor-pointer"
             title="تغییر وضعیت منو"
           >
             <Menu className="w-5 h-5" />
@@ -61,10 +97,20 @@ export const Navbar: React.FC = () => {
 
           <div 
             onClick={() => navigateTo('dashboard')}
-            className="flex items-center gap-3 cursor-pointer select-none"
+            className="flex items-center gap-2.5 cursor-pointer select-none"
           >
-            <h1 className="text-base sm:text-lg font-bold text-slate-800 tracking-tight">خلاصه وضعیت مدیریتی</h1>
-            <span className="text-xs text-slate-400 font-medium hidden md:inline border-r border-slate-200 pr-3">
+            <PostBankEmblem size={32} />
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black text-[#e30613] dark:text-[#ff5260]">پست بانک ایران</span>
+                <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
+                <h1 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight hidden sm:inline">سامانه مصوبات و جلسات</h1>
+              </div>
+              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium sm:hidden">
+                سامانه مصوبات و جلسات
+              </span>
+            </div>
+            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden md:inline border-r border-slate-200 dark:border-slate-800 pr-3 mr-1">
               امروز: {toPersianDigits('۱۴۰۳/۰۸/۱۵')}
             </span>
           </div>
@@ -77,14 +123,14 @@ export const Navbar: React.FC = () => {
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="جستجوی شماره مصوبه، عنوان جلسه..."
-              className="w-full bg-slate-100 border-none rounded-full px-4 py-1.5 pr-8 text-xs text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              placeholder="جستجوی شماره مصوبه، عنوان جلسه، نام مسئول..."
+              className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-1.5 pr-8 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
             />
             <Search className="w-4 h-4 text-slate-400 absolute right-2.5 top-2" />
             {globalSearch && (
               <button 
                 onClick={() => setGlobalSearch('')}
-                className="absolute left-2 top-1.5 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full hover:bg-slate-300"
+                className="absolute left-2 top-1.5 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full hover:bg-slate-300 dark:hover:bg-slate-600"
               >
                 پاک کردن
               </button>
@@ -92,27 +138,27 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Left side: Role switcher, AI Assistant trigger, Notifications, User Profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Left side: Role switcher, AI Assistant trigger, Notifications, Theme switch, User Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
           
-          {/* Quick Role Switcher (For demo & testing enterprise permissions) */}
-          <div className="relative">
+          {/* Quick Role Switcher */}
+          <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-1.5 px-3 rounded-full border border-slate-200 transition-colors"
+              className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
             >
-              <UserCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden md:inline font-medium text-slate-500">نقش:</span>
-              <span className="font-bold text-slate-800 max-w-[120px] truncate">{currentUser.fullName}</span>
+              <UserCheck className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+              <span className="hidden md:inline font-medium text-slate-500 dark:text-slate-400">کاربر:</span>
+              <span className="font-bold max-w-[120px] truncate">{currentUser.fullName}</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {/* Dropdown for role switching */}
             {showUserMenu && (
-              <div className="absolute left-0 mt-2 w-72 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 p-2 z-50 animate-in fade-in slide-in-from-top-2">
-                <div className="p-2 border-b border-slate-100 mb-1">
-                  <p className="text-xs font-bold text-slate-700">تغییر کاربر برای تست دسترسی‌ها</p>
-                  <p className="text-[11px] text-slate-500">انتخاب نقش سازمانی جهت بررسی رفتار کارتابل‌ها</p>
+              <div className="absolute left-0 mt-2 w-72 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="p-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-200">تغییر کاربر فعال (شبیه‌سازی)</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-400">بررسی سطح دسترسی‌ها و کارتابل‌ها با هویت‌های مختلف</p>
                 </div>
                 <div className="max-h-64 overflow-y-auto space-y-1">
                   {availableUsers.map((user) => (
@@ -121,17 +167,19 @@ export const Navbar: React.FC = () => {
                       onClick={() => {
                         setCurrentUser(user);
                         setShowUserMenu(false);
-                        showToast('تغییر نقش کاربر', `شما اکنون با هویت "${user.fullName}" وارد سامانه شدید.`, 'info');
+                        showToast('تغییر کاربر فعال', `شما اکنون با هویت "${user.fullName}" در سامانه هستید.`, 'info');
                       }}
-                      className={`w-full text-right p-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
-                        currentUser.id === user.id ? 'bg-blue-50 text-blue-800 font-bold border border-blue-200' : 'hover:bg-slate-50 text-slate-700'
+                      className={`w-full text-right p-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                        currentUser.id === user.id 
+                          ? 'bg-teal-50 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 font-bold border border-teal-200 dark:border-teal-800' 
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div>
-                        <div className="font-semibold">{user.fullName}</div>
-                        <div className="text-[10px] text-slate-500">{user.title}</div>
+                        <div className="font-bold">{user.fullName}</div>
+                        <div className="text-[10px] text-slate-400 dark:text-slate-400">{user.title}</div>
                       </div>
-                      {currentUser.id === user.id && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+                      {currentUser.id === user.id && <CheckCircle2 className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />}
                     </button>
                   ))}
                 </div>
@@ -142,61 +190,123 @@ export const Navbar: React.FC = () => {
           {/* Quick AI Assistant Trigger */}
           <button
             onClick={() => setIsAiAssistantOpen(true)}
-            className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs py-1.5 px-3 rounded-full border border-blue-200 transition-all cursor-pointer"
-            title="دستیار هوشمند مدیریت مصوبات"
+            className="flex items-center gap-1.5 bg-teal-50 dark:bg-teal-950/70 hover:bg-teal-100 dark:hover:bg-teal-900 text-teal-800 dark:text-teal-300 font-bold text-xs py-1.5 px-3 rounded-full border border-teal-200 dark:border-teal-800 transition-all cursor-pointer"
+            title="دستیار هوشمند مدیریت مصوبات و جلسات"
           >
-            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            <Sparkles className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
             <span className="hidden sm:inline">دستیار هوشمند</span>
           </button>
 
-          {/* Notifications Dropdown */}
-          <div className="relative">
+          {/* Notifications Dropdown (Item 5 Fixed) */}
+          <div className="relative" ref={notifRef}>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 text-slate-400 hover:text-blue-600 rounded-full hover:bg-slate-100 relative transition-colors"
-              title="اعلان‌ها"
+              className={`p-2 rounded-full relative transition-colors cursor-pointer ${
+                showNotifications 
+                  ? 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300' 
+                  : 'text-slate-500 dark:text-slate-400 hover:text-teal-800 dark:hover:text-teal-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title="اعلان‌ها و اطلاعیه‌ها"
             >
               <Bell className="w-4 h-4" />
               {unreadNotificationsCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-rose-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center px-1 border-2 border-white dark:border-slate-900">
+                  {toPersianDigits(unreadNotificationsCount)}
+                </span>
               )}
             </button>
 
             {showNotifications && (
-              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 p-3 z-50 animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+              <div className="absolute left-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-3.5 z-50 animate-in fade-in slide-in-from-top-2 space-y-2.5">
+                {/* Notification Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-blue-600" />
-                    <span className="font-bold text-xs text-slate-800">اطلاعیه‌های سیستمی</span>
+                    <div className="p-1.5 rounded-lg bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300">
+                      <Bell className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs text-slate-900 dark:text-slate-100">اعلان‌های سامانه</h4>
+                      <p className="text-[10px] text-slate-400">پیام‌ها و ارجاعات جدید شما</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                    {toPersianDigits(unreadNotificationsCount)} پیام جدید
-                  </span>
+
+                  <div className="flex items-center gap-1">
+                    {unreadNotificationsCount > 0 && (
+                      <button
+                        onClick={markAllNotificationsAsRead}
+                        className="text-[10px] text-teal-800 dark:text-teal-300 hover:underline font-bold px-2 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-teal-950 cursor-pointer flex items-center gap-1"
+                        title="علامت‌گذاری همه به عنوان خوانده‌شده"
+                      >
+                        <Check className="w-3 h-3" />
+                        <span>خوانده شد</span>
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button
+                        onClick={clearAllNotifications}
+                        className="text-[10px] text-slate-400 hover:text-rose-600 p-1 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                        title="پاکسازی اعلان‌ها"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto space-y-2">
-                  {notifications.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-400">اعلانی وجود ندارد</div>
+                {/* Filter Tabs */}
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 text-[11px] font-bold">
+                  <button
+                    onClick={() => setNotificationTab('ALL')}
+                    className={`flex-1 py-1 rounded-lg transition-all cursor-pointer ${
+                      notificationTab === 'ALL'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                    }`}
+                  >
+                    همه ({toPersianDigits(notifications.length)})
+                  </button>
+                  <button
+                    onClick={() => setNotificationTab('UNREAD')}
+                    className={`flex-1 py-1 rounded-lg transition-all cursor-pointer ${
+                      notificationTab === 'UNREAD'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
+                    }`}
+                  >
+                    خوانده‌نشده ({toPersianDigits(unreadNotificationsCount)})
+                  </button>
+                </div>
+
+                {/* Notification List */}
+                <div className="max-h-72 overflow-y-auto space-y-1.5 pr-0.5">
+                  {filteredNotifications.length === 0 ? (
+                    <div className="text-center py-8 space-y-2 text-slate-400 dark:text-slate-500">
+                      <Inbox className="w-7 h-7 mx-auto opacity-40" />
+                      <p className="text-xs font-medium">اعلانی در این بخش وجود ندارد</p>
+                    </div>
                   ) : (
-                    notifications.map((notif) => (
+                    filteredNotifications.map((notif) => (
                       <div
                         key={notif.id}
-                        onClick={() => {
-                          markNotificationAsRead(notif.id);
-                          if (notif.targetRoute) {
-                            navigateTo(notif.targetRoute.replace('/', '') as any);
-                            setShowNotifications(false);
-                          }
-                        }}
-                        className={`p-2.5 rounded-xl text-xs transition-all cursor-pointer border ${
-                          !notif.isRead ? 'bg-blue-50/70 border-blue-200' : 'bg-slate-50 border-slate-100 opacity-80'
+                        onClick={() => handleNotificationClick(notif)}
+                        className={`p-2.5 rounded-2xl text-xs transition-all cursor-pointer border ${
+                          !notif.isRead 
+                            ? 'bg-teal-50/70 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800/70' 
+                            : 'bg-slate-50 dark:bg-slate-850/60 border-slate-100 dark:border-slate-800 opacity-80 hover:opacity-100'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-bold text-slate-800">{notif.title}</span>
-                          <span className="text-[10px] text-slate-400">{toPersianDigits(notif.dateJalali)} - {toPersianDigits(notif.timeString)}</span>
+                          <div className="flex items-center gap-1.5">
+                            {!notif.isRead && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-600 shrink-0"></span>
+                            )}
+                            <span className="font-extrabold text-slate-800 dark:text-slate-200">{notif.title}</span>
+                          </div>
+                          <span className="text-[9px] text-slate-400 font-mono">
+                            {toPersianDigits(notif.dateJalali)}
+                          </span>
                         </div>
-                        <p className="text-[11px] text-slate-600 leading-relaxed">{notif.message}</p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{notif.message}</p>
                       </div>
                     ))
                   )}
@@ -205,19 +315,19 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Dark mode mock toggle */}
+          {/* Dark mode toggle (Item 4 Fixed) */}
           <button 
             onClick={toggleDarkMode}
-            className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors hidden sm:flex"
-            title="تغییر پوسته"
+            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title={isDarkMode ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک'}
           >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
+            {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {/* Logout / Switch User */}
           <button
             onClick={() => setIsLoginModalOpen(true)}
-            className="p-2 text-slate-400 hover:text-red-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-rose-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title="خروج / تغییر کاربر"
           >
             <LogOut className="w-4 h-4" />
