@@ -27,7 +27,7 @@ export const ApprovalsView: React.FC = () => {
   const [approvals, setApprovals] = useState<ApprovalCartableItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('PENDING');
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ListViewMode>('cards');

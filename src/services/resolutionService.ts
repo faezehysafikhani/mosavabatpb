@@ -271,7 +271,7 @@ class MockResolutionService implements IResolutionService {
         submittedForApprovalDateJalali: '۱۴۰۳/۰۶/۲۸',
         stepNumber: 1,
         totalSteps: res.verificationConfig.steps.length,
-        stepTitle: `مرحله ۱ از ${res.verificationConfig.steps.length}: صحه‌گذاری توسط ${firstStep.approverName}`,
+        stepTitle: `صحه‌گذاری توسط ${firstStep.approverName}`,
         assignedApproverId: firstStep.approverId,
         status: 'PENDING',
         completionReport: completionNotes,
@@ -323,7 +323,7 @@ class MockResolutionService implements IResolutionService {
   }
 
   /**
-   * Approver approves the verification step
+   * Single approver approves the resolution's one verification step -> resolution closes immediately.
    */
   public async approveVerificationStep(resolutionId: string, stepNumber: number, comments: string, approverName: string): Promise<ApiResponse<Resolution>> {
     const res = this.resolutions.find((r) => r.id === resolutionId);
@@ -337,77 +337,30 @@ class MockResolutionService implements IResolutionService {
       res.verificationConfig.steps[stepIndex].actionTime = '۱۶:۲۰';
     }
 
-    const nextStepIndex = stepIndex + 1;
-    const isAllApproved = nextStepIndex >= res.verificationConfig.steps.length;
+    res.executionStatus = 'APPROVED_CLOSED';
+    this.activityLogs.unshift({
+      id: `log-${Date.now()}`,
+      targetType: 'RESOLUTION',
+      targetId: res.id,
+      action: 'تایید نهایی صحه‌گذاری و مختومه شدن مصوبه',
+      actorName: approverName,
+      actorRole: 'تاییدکننده نهایی',
+      timestampJalali: '۱۴۰۳/۰۶/۲۸',
+      timeString: '۱۶:۲۰',
+      details: `با نظر: "${comments}" تایید شد و مصوبه رسماً خاتمه یافت.`,
+      badgeColor: 'teal',
+    });
 
-    if (isAllApproved) {
-      res.executionStatus = 'APPROVED_CLOSED';
-      this.activityLogs.unshift({
-        id: `log-${Date.now()}`,
-        targetType: 'RESOLUTION',
-        targetId: res.id,
-        action: 'تایید نهایی صحه‌گذاری و مختومه شدن مصوبه',
-        actorName: approverName,
-        actorRole: 'تاییدکننده نهایی',
-        timestampJalali: '۱۴۰۳/۰۶/۲۸',
-        timeString: '۱۶:۲۰',
-        details: `مرحله ${stepNumber} با نظر: "${comments}" تایید شد و مصوبه رسماً خاتمه یافت.`,
-        badgeColor: 'teal',
-      });
-    } else {
-      res.verificationConfig.currentStepIndex = nextStepIndex;
-      const nextStep = res.verificationConfig.steps[nextStepIndex];
-      this.activityLogs.unshift({
-        id: `log-${Date.now()}`,
-        targetType: 'RESOLUTION',
-        targetId: res.id,
-        action: `تایید مرحله ${stepNumber} صحه‌گذاری`,
-        actorName: approverName,
-        actorRole: 'تاییدکننده',
-        timestampJalali: '۱۴۰۳/۰۶/۲۸',
-        timeString: '۱۶:۲۰',
-        details: `تایید شد و جهت مرحله بعدی به کارتابل ${nextStep.approverName} ارجاع شد.`,
-        badgeColor: 'blue',
-      });
-
-      const approvals = loadLocalCollection('approvals', mockApprovals);
-      const currentApproval = approvals.find((item) => item.resolutionId === resolutionId && item.stepNumber === stepNumber);
-      if (currentApproval) currentApproval.status = 'APPROVED';
-      if (!approvals.some((item) => item.resolutionId === resolutionId && item.stepNumber === nextStep.stepNumber)) {
-        approvals.unshift({
-          id: `appr-${Date.now()}`,
-          resolutionId: res.id,
-          resolutionNumber: res.resolutionNumber,
-          resolutionTitle: res.topicTitle,
-          meetingTitle: res.meetingTitle,
-          responsibleName: res.mainResponsibleName || 'مسئول اجرا',
-          responsibleDepartment: res.responsibleDepartmentName || 'واحد اجرایی',
-          completedDateJalali: res.completionDateJalali || '—',
-          submittedForApprovalDateJalali: '۱۴۰۳/۰۶/۲۸',
-          stepNumber: nextStep.stepNumber,
-          totalSteps: res.verificationConfig.steps.length,
-          stepTitle: `مرحله ${nextStep.stepNumber} از ${res.verificationConfig.steps.length}: صحه‌گذاری توسط ${nextStep.approverName}`,
-          assignedApproverId: nextStep.approverId,
-          status: 'PENDING',
-          completionReport: res.completionNotes || '',
-          attachments: res.attachments,
-        });
-      }
-      saveLocalCollection('approvals', approvals);
-    }
-
-    if (isAllApproved) {
-      const approvals = loadLocalCollection('approvals', mockApprovals);
-      const currentApproval = approvals.find((item) => item.resolutionId === resolutionId && item.stepNumber === stepNumber);
-      if (currentApproval) currentApproval.status = 'APPROVED';
-      saveLocalCollection('approvals', approvals);
-    }
+    const approvals = loadLocalCollection('approvals', mockApprovals);
+    const currentApproval = approvals.find((item) => item.resolutionId === resolutionId && item.stepNumber === stepNumber);
+    if (currentApproval) currentApproval.status = 'APPROVED';
+    saveLocalCollection('approvals', approvals);
 
     // Update task
     const tasks = loadLocalCollection('tasks', mockTasks);
     const task = tasks.find((t) => t.resolutionId === resolutionId);
     if (task) {
-      task.status = isAllApproved ? 'CLOSED' : 'PENDING_APPROVAL';
+      task.status = 'CLOSED';
       saveLocalCollection('tasks', tasks);
     }
 

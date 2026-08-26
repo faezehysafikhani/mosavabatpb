@@ -4,27 +4,18 @@ import { resolutionService } from '../../services/resolutionService';
 import { meetingService } from '../../services/meetingService';
 import { mockDepartments, mockMeetings } from '../../mock/data';
 import { PersianDatePicker } from '../../components/common/PersianDatePicker';
-import { 
-  X, 
-  Plus, 
-  Trash2, 
-  FileCheck2, 
-  Calendar, 
-  Users, 
-  ShieldCheck, 
-  ArrowLeft, 
-  AlertTriangle,
-  Send,
-  Layers,
+import {
+  X,
+  FileCheck2,
+  Calendar,
+  ShieldCheck,
   Lock,
   Building2
 } from 'lucide-react';
-import { 
-  ResolutionApprovalStatus, 
-  PriorityLevel, 
-  VerificationConfig, 
-  VerificationStep, 
-  ResolutionReferral 
+import {
+  ResolutionApprovalStatus,
+  PriorityLevel,
+  VerificationConfig,
 } from '../../types';
 import { Meeting } from '../../types';
 
@@ -63,12 +54,10 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   const [deadlineJalali, setDeadlineJalali] = useState('۱۴۰۳/۰۷/۲۰');
   const [priority, setPriority] = useState<PriorityLevel>('HIGH');
 
-  // Verification Settings
+  // Verification Settings (single-step only)
   const [requiresVerification, setRequiresVerification] = useState(true);
-  const [verificationMode, setVerificationMode] = useState<'SEQUENTIAL' | 'PARALLEL'>('SEQUENTIAL');
-  const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>([]);
+  const [verifierId, setVerifierId] = useState('');
 
-  const [newStepApproverId, setNewStepApproverId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sync with props when modal opens
@@ -87,8 +76,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
       setExecutionDescription('');
       setMainResponsibleUserId('');
       setResponsibleDepartmentId('');
-      setVerificationSteps([]);
-      setNewStepApproverId('');
+      setVerifierId('');
     }
   }, [isOpen, defaultMeetingId, defaultAgendaItemId, defaultTopicTitle]);
 
@@ -105,29 +93,6 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   const currentResponsibleUser = availableUsers.find((u) => u.id === mainResponsibleUserId);
   const currentResponsibleDept = mockDepartments.find((d) => d.id === responsibleDepartmentId) || 
     { id: responsibleDepartmentId, name: currentResponsibleUser?.departmentName || '' };
-
-  const handleAddVerificationStep = () => {
-    const user = availableUsers.find((u) => u.id === newStepApproverId);
-    if (!user) return;
-
-    const newStep: VerificationStep = {
-      stepNumber: verificationSteps.length + 1,
-      approverId: user.id,
-      approverName: user.fullName,
-      approverRole: user.title,
-      status: 'NOT_STARTED',
-    };
-
-    setVerificationSteps([...verificationSteps, newStep]);
-  };
-
-  const handleRemoveVerificationStep = (stepNumber: number) => {
-    setVerificationSteps(
-      verificationSteps
-        .filter((s) => s.stepNumber !== stepNumber)
-        .map((s, idx) => ({ ...s, stepNumber: idx + 1 }))
-    );
-  };
 
   const isLockedMeeting = Boolean(defaultMeetingId);
 
@@ -146,8 +111,8 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
       showToast('خطا', 'انتخاب مسئول اصلی اجرای مصوبه الزامی است.', 'error');
       return;
     }
-    if (approvalStatus === 'APPROVED' && requiresVerification && verificationSteps.length === 0) {
-      showToast('خطا', 'حداقل یک صحه‌گذار انتخاب کنید یا گزینه نیاز به صحه‌گذاری را غیرفعال کنید.', 'error');
+    if (approvalStatus === 'APPROVED' && requiresVerification && !verifierId) {
+      showToast('خطا', 'یک صحه‌گذار انتخاب کنید یا گزینه نیاز به صحه‌گذاری را غیرفعال کنید.', 'error');
       return;
     }
 
@@ -157,11 +122,18 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      const verifier = availableUsers.find((u) => u.id === verifierId);
       const vConfig: VerificationConfig = {
         requiresVerification,
-        mode: verificationMode,
+        mode: 'SEQUENTIAL',
         currentStepIndex: 0,
-        steps: requiresVerification ? verificationSteps : [],
+        steps: requiresVerification && verifier ? [{
+          stepNumber: 1,
+          approverId: verifier.id,
+          approverName: verifier.fullName,
+          approverRole: verifier.title,
+          status: 'NOT_STARTED',
+        }] : [],
       };
 
       const res = await resolutionService.createResolution({
@@ -415,10 +387,10 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                   <ShieldCheck className="w-5 h-5 text-teal-700" />
                   <div>
                     <h4 className="text-xs font-extrabold text-teal-950">
-                      پیکربندی صحه‌گذاری و تاییدات نهایی (Verification Workflow)
+                      صحه‌گذاری نهایی (Verification)
                     </h4>
                     <p className="text-[10px] text-teal-700">
-                      پس از اتمام کار توسط مجری، مصوبه در کارتابل افراد زیر جهت صحه‌گذاری قرار می‌گیرد.
+                      پس از اتمام کار توسط مجری، مصوبه در کارتابل صحه‌گذار زیر جهت تایید یا رد قرار می‌گیرد.
                     </p>
                   </div>
                 </div>
@@ -435,82 +407,20 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
               </div>
 
               {requiresVerification && (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
-                    <span>نحوه اجرای مراحل صحه‌گذاری:</span>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="verifMode"
-                        checked={verificationMode === 'SEQUENTIAL'}
-                        onChange={() => setVerificationMode('SEQUENTIAL')}
-                      />
-                      <span>ترتیبی (مرحله به مرحله)</span>
-                    </label>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="verifMode"
-                        checked={verificationMode === 'PARALLEL'}
-                        onChange={() => setVerificationMode('PARALLEL')}
-                      />
-                      <span>موازی (همزمان)</span>
-                    </label>
-                  </div>
-
-                  {/* Steps list */}
-                  <div className="space-y-2">
-                    {verificationSteps.map((step) => (
-                      <div
-                        key={step.stepNumber}
-                        className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl text-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-5 h-5 rounded-full bg-teal-800 text-white font-bold flex items-center justify-center text-[10px]">
-                            {step.stepNumber}
-                          </span>
-                          <div>
-                            <span className="font-bold text-slate-800">{step.approverName}</span>
-                            <span className="text-[11px] text-slate-500 mr-2">({step.approverRole})</span>
-                          </div>
-                        </div>
-                        {verificationSteps.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveVerificationStep(step.stepNumber)}
-                            className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
+                <div className="pt-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">صحه‌گذار (تایید کننده نهایی) *</label>
+                  <select
+                    value={verifierId}
+                    onChange={(e) => setVerifierId(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold text-teal-900"
+                  >
+                    <option value="">انتخاب صحه‌گذار...</option>
+                    {availableUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.fullName} - {u.title}
+                      </option>
                     ))}
-                  </div>
-
-                  {/* Add step control */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <select
-                      value={newStepApproverId}
-                      onChange={(e) => setNewStepApproverId(e.target.value)}
-                      className="text-xs p-2 bg-white border border-slate-200 rounded-xl flex-1 focus:ring-2 focus:ring-teal-500"
-                    >
-                      <option value="">انتخاب صحه‌گذار...</option>
-                      {availableUsers.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullName} - {u.title}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={handleAddVerificationStep}
-                      disabled={!newStepApproverId}
-                      className="px-3 py-2 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer shadow-2xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>افزودن صحه‌گذار</span>
-                    </button>
-                  </div>
+                  </select>
                 </div>
               )}
             </div>
