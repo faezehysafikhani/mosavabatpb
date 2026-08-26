@@ -2,6 +2,7 @@ import { DashboardKPIs, DepartmentPerformance, ApiResponse } from '../types';
 import { mockMeetings, mockResolutions, mockTasks, mockApprovals, mockDepartments, mockUsers } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { isMeetingRelatedToUser, isResolutionRelatedToUser } from './userScope';
+import { loadLocalCollection } from './localStore';
 
 export interface MonthlyMeetingTrend {
   month: string;
@@ -27,13 +28,18 @@ export interface IReportService {
 
 class MockReportService implements IReportService {
   public async getDashboardKPIs(currentUserId?: string): Promise<ApiResponse<DashboardKPIs>> {
-    const currentUser = mockUsers.find((user) => user.id === currentUserId);
+    const users = loadLocalCollection('users', mockUsers);
+    const meetings = loadLocalCollection('meetings', mockMeetings);
+    const resolutions = loadLocalCollection('resolutions', mockResolutions);
+    const tasks = loadLocalCollection('tasks', mockTasks);
+    const approvals = loadLocalCollection('approvals', mockApprovals);
+    const currentUser = users.find((user) => user.id === currentUserId);
     const scopedMeetings = currentUserId
-      ? mockMeetings.filter((meeting) => isMeetingRelatedToUser(meeting, currentUserId))
-      : mockMeetings;
+      ? meetings.filter((meeting) => isMeetingRelatedToUser(meeting, currentUserId))
+      : meetings;
     const scopedResolutions = currentUser
-      ? mockResolutions.filter((resolution) => isResolutionRelatedToUser(resolution, currentUser))
-      : currentUserId ? [] : mockResolutions;
+      ? resolutions.filter((resolution) => isResolutionRelatedToUser(resolution, currentUser))
+      : currentUserId ? [] : resolutions;
 
     const totalMeetings = scopedMeetings.length;
     const totalResolutions = scopedResolutions.length;
@@ -42,11 +48,11 @@ class MockReportService implements IReportService {
     const pendingApprovalResolutions = scopedResolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length;
     const overdueResolutions = scopedResolutions.filter((r) => r.executionStatus === 'OVERDUE').length;
 
-    const myPendingTasksCount = mockTasks.filter(
+    const myPendingTasksCount = tasks.filter(
       (t) => (t.assignedToUserId === currentUserId || !currentUserId) && (t.status === 'IN_PROGRESS' || t.status === 'NEW' || t.status === 'OVERDUE')
     ).length;
 
-    const myPendingApprovalsCount = mockApprovals.filter(
+    const myPendingApprovalsCount = approvals.filter(
       (a) => (a.assignedApproverId === currentUserId || !currentUserId) && a.status === 'PENDING'
     ).length;
 
@@ -65,13 +71,14 @@ class MockReportService implements IReportService {
   }
 
   public async getDepartmentPerformances(): Promise<ApiResponse<DepartmentPerformance[]>> {
+    const resolutions = loadLocalCollection('resolutions', mockResolutions);
     const list: DepartmentPerformance[] = mockDepartments.map((dept) => {
-      const deptResolutions = mockResolutions.filter((r) => r.responsibleDepartmentId === dept.id);
-      const totalAssigned = deptResolutions.length || Math.floor(Math.random() * 5 + 3);
-      const completed = deptResolutions.filter((r) => r.executionStatus === 'APPROVED_CLOSED').length || Math.floor(totalAssigned * 0.6);
-      const inProgress = deptResolutions.filter((r) => r.executionStatus === 'IN_PROGRESS').length || Math.floor(totalAssigned * 0.3);
-      const pendingApproval = deptResolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length || 1;
-      const overdue = deptResolutions.filter((r) => r.executionStatus === 'OVERDUE').length || 0;
+      const deptResolutions = resolutions.filter((r) => r.responsibleDepartmentId === dept.id);
+      const totalAssigned = deptResolutions.length;
+      const completed = deptResolutions.filter((r) => r.executionStatus === 'APPROVED_CLOSED').length;
+      const inProgress = deptResolutions.filter((r) => r.executionStatus === 'IN_PROGRESS').length;
+      const pendingApproval = deptResolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length;
+      const overdue = deptResolutions.filter((r) => r.executionStatus === 'OVERDUE').length;
       const completionRatePercent = totalAssigned > 0 ? Math.round((completed / totalAssigned) * 100) : 0;
 
       return {
@@ -89,12 +96,13 @@ class MockReportService implements IReportService {
   }
 
   public async getResolutionStatusDistribution(): Promise<ApiResponse<ResolutionStatusDistribution[]>> {
-    const total = mockResolutions.length || 1;
-    const inProgress = mockResolutions.filter((r) => r.executionStatus === 'IN_PROGRESS').length;
-    const closed = mockResolutions.filter((r) => r.executionStatus === 'APPROVED_CLOSED').length;
-    const pendingVerif = mockResolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length;
-    const overdue = mockResolutions.filter((r) => r.executionStatus === 'OVERDUE').length;
-    const notStarted = mockResolutions.filter((r) => r.executionStatus === 'NOT_STARTED').length;
+    const resolutions = loadLocalCollection('resolutions', mockResolutions);
+    const total = resolutions.length || 1;
+    const inProgress = resolutions.filter((r) => r.executionStatus === 'IN_PROGRESS').length;
+    const closed = resolutions.filter((r) => r.executionStatus === 'APPROVED_CLOSED').length;
+    const pendingVerif = resolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length;
+    const overdue = resolutions.filter((r) => r.executionStatus === 'OVERDUE').length;
+    const notStarted = resolutions.filter((r) => r.executionStatus === 'NOT_STARTED').length;
 
     const data: ResolutionStatusDistribution[] = [
       { statusKey: 'IN_PROGRESS', statusLabel: 'در حال انجام', count: inProgress, percentage: Math.round((inProgress / total) * 100), color: '#3b82f6' },

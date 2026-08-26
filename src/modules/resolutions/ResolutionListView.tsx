@@ -41,6 +41,10 @@ export const ResolutionListView: React.FC = () => {
     fetchResolutions();
   }, [searchTerm, executionFilter, departmentFilter, refreshTrigger, currentUser.id]);
 
+  useEffect(() => {
+    if (selectedResolutionId) setActiveModalResId(selectedResolutionId);
+  }, [selectedResolutionId]);
+
   const fetchResolutions = async () => {
     setLoading(true);
     try {
@@ -238,7 +242,10 @@ export const ResolutionListView: React.FC = () => {
       {/* Detail & Action Modal */}
       <ResolutionDetailModal
         resolutionId={activeModalResId}
-        onClose={() => setActiveModalResId(null)}
+        onClose={() => {
+          setActiveModalResId(null);
+          setSelectedResolutionId(null);
+        }}
       />
     </div>
   );

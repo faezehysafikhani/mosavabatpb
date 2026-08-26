@@ -22,58 +22,37 @@ export const CreateMeetingModal: React.FC = () => {
   const [dateJalali, setDateJalali] = useState(createMeetingInitialDate || '۱۴۰۳/۰۷/۰۵');
   const [startTime, setStartTime] = useState('۰۹:۰۰');
   const [endTime, setEndTime] = useState('۱۱:۳۰');
-  const [location, setLocation] = useState('سالن کنفرانس طبقه چهارم');
+  const [location, setLocation] = useState('');
   const [departmentId, setDepartmentId] = useState('dept-1');
-  const [organizerId, setOrganizerId] = useState('user-1');
-  const [secretaryId, setSecretaryId] = useState('user-8');
+  const [organizerId, setOrganizerId] = useState('');
+  const [secretaryId, setSecretaryId] = useState('');
   const [description, setDescription] = useState('');
 
   // Sync dateJalali when modal opens with custom initial date
   useEffect(() => {
     if (isCreateMeetingOpen && createMeetingInitialDate) {
       setDateJalali(createMeetingInitialDate);
+      setTitle('');
+      setLocation('');
+      setOrganizerId('');
+      setSecretaryId('');
+      setDescription('');
+      setSelectedMemberIds([]);
+      setAgendas([]);
+      setNewAgendaTitle('');
+      setNewAgendaPresenterId('');
     }
   }, [isCreateMeetingOpen, createMeetingInitialDate]);
 
   // Agenda items
-  const [agendas, setAgendas] = useState<AgendaItem[]>([
-    {
-      id: 'ag-1',
-      rowNumber: 1,
-      order: 1,
-      title: 'بررسی گزارش دوره‌ای پروژه‌های اولویت‌دار',
-      presenter: 'مهندس پوریا حسینی',
-      presenterName: 'مهندس پوریا حسینی',
-      allocatedMinutes: 30,
-      estimatedMinutes: 30,
-      isDiscussed: false,
-      status: 'PENDING',
-    },
-    {
-      id: 'ag-2',
-      rowNumber: 2,
-      order: 2,
-      title: 'بررسی درخواست تخصیص اعتبار خرید تجهیزات زیرساخت شبکه',
-      presenter: 'مهندس سعید تقوی',
-      presenterName: 'مهندس سعید تقوی',
-      allocatedMinutes: 45,
-      estimatedMinutes: 45,
-      isDiscussed: false,
-      status: 'PENDING',
-    },
-  ]);
+  const [agendas, setAgendas] = useState<AgendaItem[]>([]);
 
   const [newAgendaTitle, setNewAgendaTitle] = useState('');
   const [newAgendaPresenterId, setNewAgendaPresenterId] = useState('');
   const [newAgendaMinutes, setNewAgendaMinutes] = useState(30);
 
   // Selected members
-  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([
-    'user-1',
-    'user-2',
-    'user-3',
-    'user-8',
-  ]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -146,18 +125,23 @@ export const CreateMeetingModal: React.FC = () => {
       showToast('خطا', 'عنوان جلسه الزامی است.', 'error');
       return;
     }
+    if (!organizerId || !secretaryId) {
+      showToast('خطا', 'انتخاب برگزارکننده و دبیر جلسه الزامی است.', 'error');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      const members: MeetingMember[] = selectedMemberIds.map((uId) => {
+      const participantIds = Array.from(new Set([...selectedMemberIds, organizerId, secretaryId]));
+      const members: MeetingMember[] = participantIds.map((uId) => {
         const u = availableUsers.find((user) => user.id === uId) || availableUsers[0];
         return {
           userId: u.id,
           fullName: u.fullName,
-          roleInMeeting: u.id === organizerId ? 'CHAIRMAN' : u.id === secretaryId ? 'SECRETARY' : 'MEMBER',
-          organizationPosition: u.title,
+          roleTitle: u.title,
           departmentName: u.departmentName,
-          attendanceStatus: 'INVITED',
+          attendanceType: u.id === organizerId ? 'ORGANIZER' : u.id === secretaryId ? 'SECRETARY' : 'MEMBER',
+          presenceStatus: 'PRESENT',
         };
       });
 
@@ -315,6 +299,23 @@ export const CreateMeetingModal: React.FC = () => {
                 اعضا و مدعوین جلسه ({selectedMemberIds.length} نفر انتخاب شده)
               </span>
             </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">برگزارکننده جلسه *</label>
+                <select value={organizerId} onChange={(e) => setOrganizerId(e.target.value)} required className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <option value="">انتخاب برگزارکننده...</option>
+                  {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} ({user.title})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">دبیر جلسه *</label>
+                <select value={secretaryId} onChange={(e) => setSecretaryId(e.target.value)} required className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <option value="">انتخاب دبیر جلسه...</option>
+                  {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} ({user.title})</option>)}
+                </select>
+              </div>
+            </div>
 
             {/* Selected Members Chips */}
             {selectedUsers.length > 0 && (

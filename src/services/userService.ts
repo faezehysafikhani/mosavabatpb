@@ -1,11 +1,13 @@
 import { User, Department, Organization, ApiResponse, AppNotification } from '../types';
 import { mockUsers, mockDepartments, mockOrganizations, mockNotifications } from '../mock/data';
 import { apiClient } from './api/apiClient';
+import { loadLocalCollection, saveLocalCollection } from './localStore';
 
 export interface IUserService {
   getUsers(): Promise<ApiResponse<User[]>>;
   getUserById(id: string): Promise<ApiResponse<User | null>>;
   createUser(dto: Omit<User, 'id'>): Promise<ApiResponse<User>>;
+  updateUser(id: string, dto: Omit<User, 'id'>): Promise<ApiResponse<User>>;
   getDepartments(): Promise<ApiResponse<Department[]>>;
   getOrganizations(): Promise<ApiResponse<Organization[]>>;
   getNotifications(userId?: string): Promise<ApiResponse<AppNotification[]>>;
@@ -13,10 +15,10 @@ export interface IUserService {
 }
 
 class MockUserService implements IUserService {
-  private users: User[] = mockUsers;
+  private users: User[] = loadLocalCollection('users', mockUsers);
   private departments: Department[] = mockDepartments;
   private organizations: Organization[] = mockOrganizations;
-  private notifications: AppNotification[] = mockNotifications;
+  private notifications: AppNotification[] = loadLocalCollection('notifications', mockNotifications);
 
   public async getUsers(): Promise<ApiResponse<User[]>> {
     return apiClient.simulateNetwork(this.users, 100);
@@ -33,7 +35,16 @@ class MockUserService implements IUserService {
       ...dto,
     };
     this.users.unshift(newUser);
+    saveLocalCollection('users', this.users);
     return apiClient.simulateNetwork(newUser, 100);
+  }
+
+  public async updateUser(id: string, dto: Omit<User, 'id'>): Promise<ApiResponse<User>> {
+    const index = this.users.findIndex((user) => user.id === id);
+    if (index === -1) throw new Error('کاربر یافت نشد');
+    this.users[index] = { id, ...dto };
+    saveLocalCollection('users', this.users);
+    return apiClient.simulateNetwork(this.users[index], 100);
   }
 
   public async getDepartments(): Promise<ApiResponse<Department[]>> {
@@ -51,6 +62,7 @@ class MockUserService implements IUserService {
   public async markNotificationAsRead(id: string): Promise<ApiResponse<boolean>> {
     const notif = this.notifications.find((n) => n.id === id);
     if (notif) notif.isRead = true;
+    saveLocalCollection('notifications', this.notifications);
     return apiClient.simulateNetwork(true, 50);
   }
 }

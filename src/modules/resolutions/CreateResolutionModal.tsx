@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { resolutionService } from '../../services/resolutionService';
+import { meetingService } from '../../services/meetingService';
 import { mockDepartments, mockMeetings } from '../../mock/data';
 import { PersianDatePicker } from '../../components/common/PersianDatePicker';
 import { 
@@ -25,6 +26,7 @@ import {
   VerificationStep, 
   ResolutionReferral 
 } from '../../types';
+import { Meeting } from '../../types';
 
 interface CreateResolutionModalProps {
   isOpen: boolean;
@@ -42,20 +44,21 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   defaultTopicTitle,
 }) => {
   const { availableUsers, showToast, triggerRefresh } = useApp();
+  const [meetingOptions, setMeetingOptions] = useState<Meeting[]>(mockMeetings);
 
-  const [selectedMeetingId, setSelectedMeetingId] = useState(defaultMeetingId || mockMeetings[0].id);
+  const [selectedMeetingId, setSelectedMeetingId] = useState(defaultMeetingId || '');
   const [selectedAgendaItemId, setSelectedAgendaItemId] = useState(defaultAgendaItemId || '');
   const [topicTitle, setTopicTitle] = useState(defaultTopicTitle || '');
-  const [proposerName, setProposerName] = useState('مهندس پوریا حسینی');
-  const [proposerDepartment, setProposerDepartment] = useState('اداره کل فناوری اطلاعات و ارتباطات');
+  const [proposerName, setProposerName] = useState('');
+  const [proposerDepartment, setProposerDepartment] = useState('');
   const [requestDescription, setRequestDescription] = useState('');
   const [reviewResultNotes, setReviewResultNotes] = useState('');
   const [approvalStatus, setApprovalStatus] = useState<ResolutionApprovalStatus>('APPROVED');
 
   // Execution Details
   const [executionDescription, setExecutionDescription] = useState('');
-  const [mainResponsibleUserId, setMainResponsibleUserId] = useState(availableUsers[1]?.id || 'user-2');
-  const [responsibleDepartmentId, setResponsibleDepartmentId] = useState('dept-1');
+  const [mainResponsibleUserId, setMainResponsibleUserId] = useState('');
+  const [responsibleDepartmentId, setResponsibleDepartmentId] = useState('');
   const [assignedDateJalali, setAssignedDateJalali] = useState('۱۴۰۳/۰۶/۲۸');
   const [deadlineJalali, setDeadlineJalali] = useState('۱۴۰۳/۰۷/۲۰');
   const [priority, setPriority] = useState<PriorityLevel>('HIGH');
@@ -63,32 +66,29 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   // Verification Settings
   const [requiresVerification, setRequiresVerification] = useState(true);
   const [verificationMode, setVerificationMode] = useState<'SEQUENTIAL' | 'PARALLEL'>('SEQUENTIAL');
-  const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>([
-    {
-      stepNumber: 1,
-      approverId: 'user-3',
-      approverName: 'دکتر مسعود احمدی',
-      approverRole: 'معاون برنامه‌ریزی و نظارت راهبردی',
-      status: 'NOT_STARTED',
-    },
-    {
-      stepNumber: 2,
-      approverId: 'user-1',
-      approverName: 'دکتر علیرضا رستمی',
-      approverRole: 'رئیس سازمان و رئیس شورا',
-      status: 'NOT_STARTED',
-    },
-  ]);
+  const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>([]);
 
-  const [newStepApproverId, setNewStepApproverId] = useState(availableUsers[3]?.id || 'user-4');
+  const [newStepApproverId, setNewStepApproverId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sync with props when modal opens
   useEffect(() => {
     if (isOpen) {
-      if (defaultMeetingId) setSelectedMeetingId(defaultMeetingId);
-      if (defaultAgendaItemId) setSelectedAgendaItemId(defaultAgendaItemId);
-      if (defaultTopicTitle) setTopicTitle(defaultTopicTitle);
+      meetingService.getMeetings({ pageSize: 100 }).then((response) => {
+        if (response.isSuccess) setMeetingOptions(response.data.items);
+      });
+      setSelectedMeetingId(defaultMeetingId || '');
+      setSelectedAgendaItemId(defaultAgendaItemId || '');
+      setTopicTitle(defaultTopicTitle || '');
+      setProposerName('');
+      setProposerDepartment('');
+      setRequestDescription('');
+      setReviewResultNotes('');
+      setExecutionDescription('');
+      setMainResponsibleUserId('');
+      setResponsibleDepartmentId('');
+      setVerificationSteps([]);
+      setNewStepApproverId('');
     }
   }, [isOpen, defaultMeetingId, defaultAgendaItemId, defaultTopicTitle]);
 
@@ -104,7 +104,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
 
   const currentResponsibleUser = availableUsers.find((u) => u.id === mainResponsibleUserId);
   const currentResponsibleDept = mockDepartments.find((d) => d.id === responsibleDepartmentId) || 
-    { id: 'dept-1', name: currentResponsibleUser?.departmentName || 'اداره کل فناوری اطلاعات و ارتباطات' };
+    { id: responsibleDepartmentId, name: currentResponsibleUser?.departmentName || '' };
 
   const handleAddVerificationStep = () => {
     const user = availableUsers.find((u) => u.id === newStepApproverId);
@@ -138,7 +138,21 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
       return;
     }
 
-    const meeting = mockMeetings.find((m) => m.id === selectedMeetingId) || mockMeetings[0];
+    if (!selectedMeetingId) {
+      showToast('خطا', 'انتخاب جلسه مرجع الزامی است.', 'error');
+      return;
+    }
+    if (approvalStatus === 'APPROVED' && !mainResponsibleUserId) {
+      showToast('خطا', 'انتخاب مسئول اصلی اجرای مصوبه الزامی است.', 'error');
+      return;
+    }
+    if (approvalStatus === 'APPROVED' && requiresVerification && verificationSteps.length === 0) {
+      showToast('خطا', 'حداقل یک صحه‌گذار انتخاب کنید یا گزینه نیاز به صحه‌گذاری را غیرفعال کنید.', 'error');
+      return;
+    }
+
+    const meeting = meetingOptions.find((m) => m.id === selectedMeetingId);
+    if (!meeting) return;
     const responsibleUser = availableUsers.find((u) => u.id === mainResponsibleUserId);
 
     setIsSubmitting(true);
@@ -230,7 +244,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                 {isLockedMeeting ? (
                   <div className="p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-teal-700" />
-                    <span>{mockMeetings.find((m) => m.id === selectedMeetingId)?.title || 'جلسه انتخاب‌شده'}</span>
+                    <span>{meetingOptions.find((m) => m.id === selectedMeetingId)?.title || 'جلسه انتخاب‌شده'}</span>
                   </div>
                 ) : (
                   <select
@@ -238,7 +252,8 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                     onChange={(e) => setSelectedMeetingId(e.target.value)}
                     className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
                   >
-                    {mockMeetings.map((m) => (
+                    <option value="">انتخاب جلسه مرجع...</option>
+                    {meetingOptions.map((m) => (
                       <option key={m.id} value={m.id}>{m.meetingNumber} - {m.title}</option>
                     ))}
                   </select>
@@ -334,6 +349,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                     onChange={(e) => setMainResponsibleUserId(e.target.value)}
                     className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold text-teal-900"
                   >
+                    <option value="">انتخاب مسئول اجرا...</option>
                     {availableUsers.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.fullName} ({u.title})
@@ -353,7 +369,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                   </label>
                   <div className="w-full text-xs p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 flex items-center gap-2 cursor-not-allowed">
                     <Building2 className="w-4 h-4 text-teal-700 shrink-0" />
-                    <span className="truncate">{currentResponsibleDept.name}</span>
+                    <span className="truncate">{mainResponsibleUserId ? currentResponsibleDept.name : 'پس از انتخاب مسئول تکمیل می‌شود'}</span>
                   </div>
                 </div>
 
@@ -478,6 +494,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                       onChange={(e) => setNewStepApproverId(e.target.value)}
                       className="text-xs p-2 bg-white border border-slate-200 rounded-xl flex-1 focus:ring-2 focus:ring-teal-500"
                     >
+                      <option value="">انتخاب صحه‌گذار...</option>
                       {availableUsers.map((u) => (
                         <option key={u.id} value={u.id}>
                           {u.fullName} - {u.title}
@@ -487,6 +504,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                     <button
                       type="button"
                       onClick={handleAddVerificationStep}
+                      disabled={!newStepApproverId}
                       className="px-3 py-2 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold rounded-xl flex items-center gap-1 cursor-pointer shadow-2xs"
                     >
                       <Plus className="w-3.5 h-3.5" />

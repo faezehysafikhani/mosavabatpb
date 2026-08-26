@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Users, Building2, ShieldCheck, Mail, Phone, Search, UserPlus, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, ShieldCheck, Mail, Phone, Search, UserPlus, Pencil } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { mockDepartments } from '../../mock/data';
 import { toPersianDigits } from '../../utils/formatters';
 import { CreateUserModal } from './CreateUserModal';
+import { User } from '../../types';
 
 export const UsersView: React.FC = () => {
   const { availableUsers, hasPermission } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const canCreateUser = hasPermission('CREATE_USER') || hasPermission('MANAGE_USERS');
+  const canManageUsers = hasPermission('CREATE_USER') || hasPermission('MANAGE_USERS');
 
   const filteredUsers = availableUsers.filter((u) => {
     const matchSearch =
@@ -54,7 +56,7 @@ export const UsersView: React.FC = () => {
           </p>
         </div>
 
-        {canCreateUser && (
+        {canManageUsers && (
           <button
             onClick={() => setIsAddUserOpen(true)}
             className="flex items-center gap-2 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs transition-all cursor-pointer"
@@ -126,6 +128,17 @@ export const UsersView: React.FC = () => {
               </div>
             </div>
 
+            {canManageUsers && (
+              <button
+                type="button"
+                onClick={() => setEditingUser(user)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-100 text-[11px] font-bold"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                ویرایش کاربر
+              </button>
+            )}
+
             <div className="space-y-1.5 text-[11px] text-slate-600 pt-2 border-t border-slate-100">
               {user.username && (
                 <div className="flex items-center justify-between text-slate-500">
@@ -154,6 +167,11 @@ export const UsersView: React.FC = () => {
       <CreateUserModal
         isOpen={isAddUserOpen}
         onClose={() => setIsAddUserOpen(false)}
+      />
+      <CreateUserModal
+        isOpen={Boolean(editingUser)}
+        user={editingUser}
+        onClose={() => setEditingUser(null)}
       />
     </div>
   );

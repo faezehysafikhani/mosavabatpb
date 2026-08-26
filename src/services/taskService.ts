@@ -2,6 +2,7 @@ import { Task, ApiResponse, ApiFilterParams, PagedResult } from '../types';
 import { mockTasks } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { resolutionService } from './resolutionService';
+import { loadLocalCollection, saveLocalCollection } from './localStore';
 
 export interface ITaskService {
   getMyTasks(userId?: string, params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Task>>>;
@@ -11,10 +12,10 @@ export interface ITaskService {
 }
 
 class MockTaskService implements ITaskService {
-  private tasks: Task[] = [...mockTasks];
+  private getTasksData = () => loadLocalCollection('tasks', mockTasks);
 
   public async getMyTasks(userId?: string, params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Task>>> {
-    let filtered = [...this.tasks];
+    let filtered = this.getTasksData();
 
     // A personal cartable always contains only tasks assigned to the active user.
     if (userId) {
@@ -56,15 +57,16 @@ class MockTaskService implements ITaskService {
   }
 
   public async getTaskById(id: string): Promise<ApiResponse<Task | null>> {
-    const task = this.tasks.find((t) => t.id === id) || null;
+    const task = this.getTasksData().find((t) => t.id === id) || null;
     return apiClient.simulateNetwork(task, 100);
   }
 
   public async submitTaskCompletion(taskId: string, completionNotes: string, attachments?: Task['attachments']): Promise<ApiResponse<Task>> {
-    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+    const tasks = this.getTasksData();
+    const taskIndex = tasks.findIndex((t) => t.id === taskId);
     if (taskIndex === -1) throw new Error('وظیفه یافت نشد');
 
-    const task = this.tasks[taskIndex];
+    const task = tasks[taskIndex];
     task.completionNotes = completionNotes;
     task.completionDateJalali = '۱۴۰۳/۰۶/۲۸';
     if (attachments) {
@@ -76,16 +78,19 @@ class MockTaskService implements ITaskService {
 
     // Refresh task status based on whether verification was required
     task.status = task.requiresVerification ? 'PENDING_APPROVAL' : 'CLOSED';
+    saveLocalCollection('tasks', tasks);
 
     return apiClient.simulateNetwork(task, 200);
   }
 
   public async updateTaskStatus(taskId: string, status: Task['status']): Promise<ApiResponse<Task>> {
-    const taskIndex = this.tasks.findIndex((t) => t.id === taskId);
+    const tasks = this.getTasksData();
+    const taskIndex = tasks.findIndex((t) => t.id === taskId);
     if (taskIndex === -1) throw new Error('وظیفه یافت نشد');
 
-    this.tasks[taskIndex].status = status;
-    return apiClient.simulateNetwork(this.tasks[taskIndex], 120);
+    tasks[taskIndex].status = status;
+    saveLocalCollection('tasks', tasks);
+    return apiClient.simulateNetwork(tasks[taskIndex], 120);
   }
 }
 

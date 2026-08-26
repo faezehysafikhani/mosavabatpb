@@ -538,7 +538,7 @@ export const DashboardView: React.FC = () => {
                 return (
                   <tr 
                     key={res.id} 
-                    onClick={() => navigateTo('resolutions')}
+                    onClick={() => navigateTo('resolutions', { resolutionId: res.id })}
                     className="hover:bg-slate-50/80 transition-colors cursor-pointer"
                   >
                     <td className="py-3 px-3 font-bold text-slate-600">{toPersianDigits(index + 1)}</td>

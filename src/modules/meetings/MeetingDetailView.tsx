@@ -376,7 +376,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                 return (
                   <div
                     key={res.id}
-                    onClick={() => navigateTo('resolutions')}
+                    onClick={() => navigateTo('resolutions', { resolutionId: res.id })}
                     className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 hover:bg-white hover:border-teal-400 transition-all cursor-pointer group"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">

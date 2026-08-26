@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AppNotification, PermissionKey } from '../types';
 import { mockUsers, mockNotifications } from '../mock/data';
 import { userService } from '../services/userService';
+import { loadLocalCollection, loadLocalValue, saveLocalCollection, saveLocalValue } from '../services/localStore';
 
 export type AppRoute = 
   | 'dashboard'
@@ -37,6 +38,7 @@ interface AppContextType {
   setCurrentUser: (user: User) => void;
   availableUsers: User[];
   addUser: (userData: Omit<User, 'id'>) => Promise<User>;
+  updateUser: (id: string, userData: Omit<User, 'id'>) => Promise<User>;
   currentRoute: AppRoute;
   navigateTo: (route: AppRoute, params?: { meetingId?: string; resolutionId?: string; taskId?: string }) => void;
   selectedMeetingId: string | null;
@@ -83,15 +85,17 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Default to User-2 (مهندس حسینی - مدیر فناوری اطلاعات) or Admin
-  const [currentUser, setCurrentUser] = useState<User>(mockUsers[1]);
-  const [availableUsers, setAvailableUsers] = useState<User[]>(mockUsers);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const initialUsers = loadLocalCollection('users', mockUsers);
+  const savedUserId = loadLocalValue<string | null>('currentUserId', null);
+  const [currentUser, setCurrentUserState] = useState<User>(initialUsers.find((user) => user.id === savedUserId) || initialUsers[1] || initialUsers[0]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>(initialUsers);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(loadLocalValue('isAuthenticated', true));
   const [currentRoute, setCurrentRoute] = useState<AppRoute>('dashboard');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [globalSearch, setGlobalSearch] = useState<string>('');
-  const [notifications, setNotifications] = useState<AppNotification[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<AppNotification[]>(loadLocalCollection('notifications', mockNotifications));
   const [toasts, setToasts] = useState<ToastInfo[]>([]);
   const [isCreateMeetingOpen, setIsCreateMeetingOpen] = useState<boolean>(false);
   const [createMeetingInitialDate, setCreateMeetingInitialDate] = useState<string>('۱۴۰۳/۰۷/۰۵');
@@ -131,6 +135,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
+  const setCurrentUser = (user: User) => {
+    setCurrentUserState(user);
+    saveLocalValue('currentUserId', user.id);
+  };
+
   const navigateTo = (route: AppRoute, params?: { meetingId?: string; resolutionId?: string; taskId?: string }) => {
     if (params?.meetingId) {
       setSelectedMeetingId(params.meetingId);
@@ -152,12 +161,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotifications((prev) => {
+      const next = prev.map((n) => ({ ...n, isRead: true }));
+      saveLocalCollection('notifications', next);
+      return next;
+    });
     showToast('اعلان‌ها', 'تمامی اعلان‌ها به عنوان خوانده‌شده علامت‌گذاری شدند.', 'info');
   };
 
   const clearAllNotifications = () => {
     setNotifications([]);
+    saveLocalCollection('notifications', []);
     showToast('اعلان‌ها', 'تمامی اعلان‌ها پاک شدند.', 'info');
   };
 
@@ -207,18 +221,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) {
       setCurrentUser(user);
       setIsAuthenticated(true);
+      saveLocalValue('isAuthenticated', true);
       setIsLoginModalOpen(false);
       navigateTo('dashboard');
       showToast('ورود موفق', `خوش آمدید ${user.fullName} (${user.title})`, 'success');
-      return true;
-    }
-    // Fallback if not found: select first user
-    if (availableUsers.length > 0) {
-      setCurrentUser(availableUsers[0]);
-      setIsAuthenticated(true);
-      setIsLoginModalOpen(false);
-      navigateTo('dashboard');
-      showToast('ورود موفق', `ورود با هویت ${availableUsers[0].fullName}`, 'success');
       return true;
     }
     showToast('خطای ورود', 'کاربر مورد نظر یافت نشد.', 'error');
@@ -227,6 +233,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logout = () => {
     setIsAuthenticated(false);
+    saveLocalValue('isAuthenticated', false);
     setIsLoginModalOpen(true);
     showToast('خروج از سیستم', 'از حساب کاربری خارج شدید.', 'info');
   };
@@ -238,6 +245,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('ثبت کاربر جدید', `کاربر "${newUser.fullName}" با موفقیت اضافه شد.`, 'success');
     triggerRefresh();
     return newUser;
+  };
+
+  const updateUser = async (id: string, userData: Omit<User, 'id'>): Promise<User> => {
+    const res = await userService.updateUser(id, userData);
+    const updatedUser = res.data;
+    setAvailableUsers((prev) => prev.map((user) => user.id === id ? updatedUser : user));
+    if (currentUser.id === id) setCurrentUser(updatedUser);
+    showToast('ویرایش کاربر', `اطلاعات کاربر «${updatedUser.fullName}» ذخیره شد.`, 'success');
+    triggerRefresh();
+    return updatedUser;
   };
 
   const openCreateResolutionModal = (opts?: {
@@ -264,6 +281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser,
         availableUsers,
         addUser,
+        updateUser,
         currentRoute,
         navigateTo,
         selectedMeetingId,

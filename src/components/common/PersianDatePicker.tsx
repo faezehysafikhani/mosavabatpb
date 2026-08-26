@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, X, Clock } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toPersianDigits } from '../../utils/formatters';
 
 interface PersianDatePickerProps {
@@ -28,6 +28,53 @@ const PERSIAN_MONTHS = [
   'بهمن',
   'اسفند',
 ];
+
+const WEEK_DAYS = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
+
+const OFFICIAL_SOLAR_HOLIDAYS: Record<string, string> = {
+  '01/01': 'نوروز',
+  '01/02': 'نوروز',
+  '01/03': 'نوروز',
+  '01/04': 'نوروز',
+  '01/12': 'روز جمهوری اسلامی',
+  '01/13': 'روز طبیعت',
+  '03/14': 'رحلت امام خمینی (ره)',
+  '03/15': 'قیام ۱۵ خرداد',
+  '11/22': 'پیروزی انقلاب اسلامی',
+  '12/29': 'ملی شدن صنعت نفت',
+};
+
+const div = (a: number, b: number) => Math.trunc(a / b);
+
+const jalaliToGregorian = (jy: number, jm: number, jd: number): [number, number, number] => {
+  let year = jy + 1595;
+  let days = -355668 + (365 * year) + (div(year, 33) * 8) + div((year % 33) + 3, 4) + jd;
+  days += jm < 7 ? (jm - 1) * 31 : ((jm - 7) * 30) + 186;
+  let gy = 400 * div(days, 146097);
+  days %= 146097;
+  if (days > 36524) {
+    gy += 100 * div(--days, 36524);
+    days %= 36524;
+    if (days >= 365) days++;
+  }
+  gy += 4 * div(days, 1461);
+  days %= 1461;
+  if (days > 365) {
+    gy += div(days - 1, 365);
+    days = (days - 1) % 365;
+  }
+  let gd = days + 1;
+  const leap = gy % 4 === 0 && gy % 100 !== 0 || gy % 400 === 0;
+  const monthDays = [0, 31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  let gm = 1;
+  while (gm <= 12 && gd > monthDays[gm]) gd -= monthDays[gm++];
+  return [gy, gm, gd];
+};
+
+const getWeekDayIndex = (year: number, month: number, day: number) => {
+  const [gy, gm, gd] = jalaliToGregorian(year, month, day);
+  return (new Date(Date.UTC(gy, gm - 1, gd)).getUTCDay() + 1) % 7;
+};
 
 export const PersianDatePicker: React.FC<PersianDatePickerProps> = ({
   value,
@@ -139,6 +186,7 @@ export const PersianDatePicker: React.FC<PersianDatePickerProps> = ({
   };
 
   const daysCount = getDaysInMonth(viewYear, viewMonth);
+  const firstDayOffset = getWeekDayIndex(viewYear, viewMonth, 1);
   const yearsList = [];
   for (let y = minYear; y <= maxYear; y++) {
     yearsList.push(y);
@@ -256,9 +304,17 @@ export const PersianDatePicker: React.FC<PersianDatePickerProps> = ({
           </div>
 
           {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1">
+            {WEEK_DAYS.map((day, index) => <span key={day} className={index === 6 ? 'text-rose-500' : ''}>{day}</span>)}
+          </div>
           <div className="grid grid-cols-7 gap-1 text-center text-xs">
+            {Array.from({ length: firstDayOffset }).map((_, idx) => <span key={`blank-${idx}`} />)}
             {Array.from({ length: daysCount }).map((_, idx) => {
               const day = idx + 1;
+              const key = `${viewMonth.toString().padStart(2, '0')}/${day.toString().padStart(2, '0')}`;
+              const officialHoliday = OFFICIAL_SOLAR_HOLIDAYS[key];
+              const isFriday = getWeekDayIndex(viewYear, viewMonth, day) === 6;
+              const holidayTitle = officialHoliday || (isFriday ? 'جمعه' : '');
               const isSelected =
                 currentParsed.year === viewYear &&
                 currentParsed.month === viewMonth &&
@@ -269,9 +325,13 @@ export const PersianDatePicker: React.FC<PersianDatePickerProps> = ({
                   key={day}
                   type="button"
                   onClick={() => handleSelectDay(day)}
+                  title={holidayTitle || undefined}
+                  aria-label={holidayTitle ? `${toPersianDigits(day)}، تعطیل: ${holidayTitle}` : toPersianDigits(day)}
                   className={`h-8 rounded-lg font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-blue-600 text-white shadow-xs font-black'
+                      : holidayTitle
+                      ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 ring-1 ring-rose-100'
                       : 'hover:bg-blue-50 hover:text-blue-700 text-slate-700'
                   }`}
                 >
@@ -283,7 +343,7 @@ export const PersianDatePicker: React.FC<PersianDatePickerProps> = ({
 
           {/* Footer close */}
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-            <span className="text-slate-400">تقویم هجری شمسی</span>
+            <span className="text-slate-400 flex items-center gap-1.5"><i className="w-2 h-2 rounded-full bg-rose-500" /> تعطیلات رسمی و جمعه‌ها</span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}

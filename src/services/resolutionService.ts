@@ -14,6 +14,7 @@ import { mockResolutions, mockActivityLogs, mockTasks, mockApprovals } from '../
 import { apiClient } from './api/apiClient';
 import { mockUsers } from '../mock/data';
 import { isResolutionRelatedToUser } from './userScope';
+import { loadLocalCollection, saveLocalCollection } from './localStore';
 
 export interface CreateResolutionDto {
   meetingId: string;
@@ -55,14 +56,20 @@ export interface IResolutionService {
 }
 
 class MockResolutionService implements IResolutionService {
-  private resolutions: Resolution[] = [...mockResolutions];
-  private activityLogs: ActivityLog[] = [...mockActivityLogs];
+  private resolutions: Resolution[] = loadLocalCollection('resolutions', mockResolutions);
+  private activityLogs: ActivityLog[] = loadLocalCollection('activityLogs', mockActivityLogs);
+
+  private persist() {
+    saveLocalCollection('resolutions', this.resolutions);
+    saveLocalCollection('activityLogs', this.activityLogs);
+  }
 
   public async getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; requiresVerification?: boolean; relatedUserId?: string }): Promise<ApiResponse<PagedResult<Resolution>>> {
     let filtered = [...this.resolutions];
 
     if (params?.relatedUserId) {
-      const relatedUser = mockUsers.find((user) => user.id === params.relatedUserId);
+      const users = loadLocalCollection('users', mockUsers);
+      const relatedUser = users.find((user) => user.id === params.relatedUserId);
       filtered = relatedUser ? filtered.filter((resolution) => isResolutionRelatedToUser(resolution, relatedUser)) : [];
     }
 
@@ -161,7 +168,8 @@ class MockResolutionService implements IResolutionService {
 
     // If approved and assigned to a user, create corresponding Task in cartable
     if (isApproved && newResolution.mainResponsibleUserId) {
-      mockTasks.unshift({
+      const tasks = loadLocalCollection('tasks', mockTasks);
+      tasks.unshift({
         id: `task-${Date.now()}`,
         resolutionId: newResolution.id,
         resolutionNumber: newResolution.resolutionNumber,
@@ -180,6 +188,7 @@ class MockResolutionService implements IResolutionService {
         instructions: newResolution.executionDescription || newResolution.requestDescription,
         attachments: newResolution.attachments,
       });
+      saveLocalCollection('tasks', tasks);
     }
 
     // Add activity log
@@ -198,6 +207,8 @@ class MockResolutionService implements IResolutionService {
       badgeColor: isApproved ? 'teal' : 'amber',
     });
 
+    this.persist();
+
     return apiClient.simulateNetwork(newResolution, 200);
   }
 
@@ -207,17 +218,19 @@ class MockResolutionService implements IResolutionService {
       throw new Error('مصوبه یافت نشد');
     }
     this.resolutions[index] = { ...this.resolutions[index], ...dto };
+    this.persist();
     return apiClient.simulateNetwork(this.resolutions[index], 150);
   }
 
   public async deleteResolution(id: string): Promise<ApiResponse<boolean>> {
     const initialLen = this.resolutions.length;
     this.resolutions = this.resolutions.filter((r) => r.id !== id);
+    this.persist();
     return apiClient.simulateNetwork(this.resolutions.length < initialLen, 150);
   }
 
   public async getResolutionActivityLogs(resolutionId: string): Promise<ApiResponse<ActivityLog[]>> {
-    const logs = this.activityLogs.filter((l) => l.targetId === resolutionId || l.targetType === 'RESOLUTION');
+    const logs = this.activityLogs.filter((l) => l.targetId === resolutionId);
     return apiClient.simulateNetwork(logs, 100);
   }
 
@@ -245,7 +258,8 @@ class MockResolutionService implements IResolutionService {
       
       // Update/add to mockApprovals
       const firstStep = res.verificationConfig.steps[0];
-      mockApprovals.unshift({
+      const approvals = loadLocalCollection('approvals', mockApprovals);
+      approvals.unshift({
         id: `appr-${Date.now()}`,
         resolutionId: res.id,
         resolutionNumber: res.resolutionNumber,
@@ -263,6 +277,7 @@ class MockResolutionService implements IResolutionService {
         completionReport: completionNotes,
         attachments: res.attachments,
       });
+      saveLocalCollection('approvals', approvals);
 
       this.activityLogs.unshift({
         id: `log-${Date.now()}`,
@@ -293,12 +308,16 @@ class MockResolutionService implements IResolutionService {
     }
 
     // Also update corresponding task status
-    const task = mockTasks.find((t) => t.resolutionId === resolutionId);
+    const tasks = loadLocalCollection('tasks', mockTasks);
+    const task = tasks.find((t) => t.resolutionId === resolutionId);
     if (task) {
       task.status = requiresVerif ? 'PENDING_APPROVAL' : 'CLOSED';
       task.completionNotes = completionNotes;
       task.completionDateJalali = '۱۴۰۳/۰۶/۲۸';
+      saveLocalCollection('tasks', tasks);
     }
+
+    this.persist();
 
     return apiClient.simulateNetwork(res, 200);
   }
@@ -350,13 +369,49 @@ class MockResolutionService implements IResolutionService {
         details: `تایید شد و جهت مرحله بعدی به کارتابل ${nextStep.approverName} ارجاع شد.`,
         badgeColor: 'blue',
       });
+
+      const approvals = loadLocalCollection('approvals', mockApprovals);
+      const currentApproval = approvals.find((item) => item.resolutionId === resolutionId && item.stepNumber === stepNumber);
+      if (currentApproval) currentApproval.status = 'APPROVED';
+      if (!approvals.some((item) => item.resolutionId === resolutionId && item.stepNumber === nextStep.stepNumber)) {
+        approvals.unshift({
+          id: `appr-${Date.now()}`,
+          resolutionId: res.id,
+          resolutionNumber: res.resolutionNumber,
+          resolutionTitle: res.topicTitle,
+          meetingTitle: res.meetingTitle,
+          responsibleName: res.mainResponsibleName || 'مسئول اجرا',
+          responsibleDepartment: res.responsibleDepartmentName || 'واحد اجرایی',
+          completedDateJalali: res.completionDateJalali || '—',
+          submittedForApprovalDateJalali: '۱۴۰۳/۰۶/۲۸',
+          stepNumber: nextStep.stepNumber,
+          totalSteps: res.verificationConfig.steps.length,
+          stepTitle: `مرحله ${nextStep.stepNumber} از ${res.verificationConfig.steps.length}: صحه‌گذاری توسط ${nextStep.approverName}`,
+          assignedApproverId: nextStep.approverId,
+          status: 'PENDING',
+          completionReport: res.completionNotes || '',
+          attachments: res.attachments,
+        });
+      }
+      saveLocalCollection('approvals', approvals);
+    }
+
+    if (isAllApproved) {
+      const approvals = loadLocalCollection('approvals', mockApprovals);
+      const currentApproval = approvals.find((item) => item.resolutionId === resolutionId && item.stepNumber === stepNumber);
+      if (currentApproval) currentApproval.status = 'APPROVED';
+      saveLocalCollection('approvals', approvals);
     }
 
     // Update task
-    const task = mockTasks.find((t) => t.resolutionId === resolutionId);
+    const tasks = loadLocalCollection('tasks', mockTasks);
+    const task = tasks.find((t) => t.resolutionId === resolutionId);
     if (task) {
       task.status = isAllApproved ? 'CLOSED' : 'PENDING_APPROVAL';
+      saveLocalCollection('tasks', tasks);
     }
+
+    this.persist();
 
     return apiClient.simulateNetwork(res, 200);
   }
@@ -390,11 +445,19 @@ class MockResolutionService implements IResolutionService {
       badgeColor: 'red',
     });
 
-    const task = mockTasks.find((t) => t.resolutionId === resolutionId);
+    const tasks = loadLocalCollection('tasks', mockTasks);
+    const task = tasks.find((t) => t.resolutionId === resolutionId);
     if (task) {
       task.status = 'RETURNED';
       task.rejectionReason = rejectionReason;
+      saveLocalCollection('tasks', tasks);
     }
+
+    const approvals = loadLocalCollection('approvals', mockApprovals);
+    const currentApproval = approvals.find((item) => item.resolutionId === resolutionId && item.stepNumber === stepNumber);
+    if (currentApproval) currentApproval.status = 'REJECTED';
+    saveLocalCollection('approvals', approvals);
+    this.persist();
 
     return apiClient.simulateNetwork(res, 200);
   }

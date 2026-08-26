@@ -2,6 +2,7 @@ import { ApprovalCartableItem, ApiResponse, ApiFilterParams, PagedResult } from 
 import { mockApprovals } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { resolutionService } from './resolutionService';
+import { loadLocalCollection, saveLocalCollection } from './localStore';
 
 export interface IApprovalService {
   getMyApprovals(userId?: string, params?: ApiFilterParams): Promise<ApiResponse<PagedResult<ApprovalCartableItem>>>;
@@ -11,10 +12,10 @@ export interface IApprovalService {
 }
 
 class MockApprovalService implements IApprovalService {
-  private approvals: ApprovalCartableItem[] = [...mockApprovals];
+  private getApprovalsData = () => loadLocalCollection('approvals', mockApprovals);
 
   public async getMyApprovals(userId?: string, params?: ApiFilterParams): Promise<ApiResponse<PagedResult<ApprovalCartableItem>>> {
-    let filtered = [...this.approvals];
+    let filtered = this.getApprovalsData();
 
     if (userId) {
       filtered = filtered.filter((a) => a.assignedApproverId === userId);
@@ -51,15 +52,16 @@ class MockApprovalService implements IApprovalService {
   }
 
   public async getApprovalById(id: string): Promise<ApiResponse<ApprovalCartableItem | null>> {
-    const item = this.approvals.find((a) => a.id === id) || null;
+    const item = this.getApprovalsData().find((a) => a.id === id) || null;
     return apiClient.simulateNetwork(item, 100);
   }
 
   public async approveItem(approvalId: string, comments: string, approverName: string): Promise<ApiResponse<ApprovalCartableItem>> {
-    const index = this.approvals.findIndex((a) => a.id === approvalId);
+    const approvals = this.getApprovalsData();
+    const index = approvals.findIndex((a) => a.id === approvalId);
     if (index === -1) throw new Error('مورد تأیید یافت نشد');
 
-    const item = this.approvals[index];
+    const item = approvals[index];
     item.status = 'APPROVED';
 
     // Propagate approval to resolution service
@@ -69,10 +71,11 @@ class MockApprovalService implements IApprovalService {
   }
 
   public async rejectItem(approvalId: string, rejectionReason: string, approverName: string): Promise<ApiResponse<ApprovalCartableItem>> {
-    const index = this.approvals.findIndex((a) => a.id === approvalId);
+    const approvals = this.getApprovalsData();
+    const index = approvals.findIndex((a) => a.id === approvalId);
     if (index === -1) throw new Error('مورد تأیید یافت نشد');
 
-    const item = this.approvals[index];
+    const item = approvals[index];
     item.status = 'REJECTED';
 
     // Propagate rejection to resolution service

@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { mockDepartments } from '../../mock/data';
-import { UserRole } from '../../types';
-import { X, UserPlus, ShieldCheck, Building2, Mail, Phone, UserCheck } from 'lucide-react';
+import { User, UserRole } from '../../types';
+import { X, UserPlus, Save } from 'lucide-react';
 
 interface CreateUserModalProps {
   isOpen: boolean;
   onClose: () => void;
+  user?: User | null;
 }
 
-export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose }) => {
-  const { addUser, showToast } = useApp();
+export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClose, user }) => {
+  const { addUser, updateUser, showToast } = useApp();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -22,6 +23,19 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
   const [role, setRole] = useState<UserRole>('EXPERT_ASSIGNEE');
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setFirstName(user?.firstName || user?.fullName.split(' ')[0] || '');
+    setLastName(user?.lastName || user?.fullName.split(' ').slice(1).join(' ') || '');
+    setUsername(user?.username || '');
+    setEmail(user?.email || '');
+    setPhone(user?.phone || '');
+    setTitle(user?.title || '');
+    setDepartmentId(user?.departmentId || mockDepartments[0].id);
+    setRole(user?.role || 'EXPERT_ASSIGNEE');
+    setIsActive(user?.isActive ?? true);
+  }, [isOpen, user]);
 
   if (!isOpen) return null;
 
@@ -96,8 +110,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
 
     setIsSubmitting(true);
     try {
-      await addUser({
-        nationalCode: '00' + Math.floor(10000000 + Math.random() * 90000000),
+      const userData: Omit<User, 'id'> = {
+        nationalCode: user?.nationalCode || '00' + Math.floor(10000000 + Math.random() * 90000000),
         username: generatedUsername,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -113,7 +127,10 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
         organizationName: 'سازمان مرکزی فناوری و اطلاعات',
         isActive,
         permissions: getPermissionsForRole(role),
-      });
+      };
+
+      if (user) await updateUser(user.id, userData);
+      else await addUser(userData);
 
       onClose();
     } catch (err) {
@@ -133,8 +150,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">افزودن کاربر جدید به سامانه</h3>
-              <p className="text-[11px] text-teal-200">تعریف مشخصات هویتی، واحد سازمانی و نقش کاربری</p>
+              <h3 className="text-sm font-bold text-white">{user ? 'ویرایش کاربر' : 'افزودن کاربر جدید به سامانه'}</h3>
+              <p className="text-[11px] text-teal-200">{user ? 'اصلاح مشخصات، واحد و سطح دسترسی کاربر' : 'تعریف مشخصات هویتی، واحد سازمانی و نقش کاربری'}</p>
             </div>
           </div>
           <button
@@ -285,8 +302,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
               disabled={isSubmitting}
               className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
             >
-              <UserPlus className="w-4 h-4" />
-              <span>{isSubmitting ? 'در حال ثبت...' : 'ثبت و فعال‌سازی کاربر'}</span>
+              {user ? <Save className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+              <span>{isSubmitting ? 'در حال ذخیره...' : user ? 'ذخیره تغییرات' : 'ثبت و فعال‌سازی کاربر'}</span>
             </button>
           </div>
         </form>

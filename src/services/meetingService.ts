@@ -1,6 +1,7 @@
 import { Meeting, MeetingStatus, ApiResponse, ApiFilterParams, PagedResult } from '../types';
 import { mockMeetings, mockResolutions } from '../mock/data';
 import { apiClient } from './api/apiClient';
+import { loadLocalCollection, saveLocalCollection } from './localStore';
 
 export interface CreateMeetingDto {
   title: string;
@@ -28,10 +29,12 @@ export interface IMeetingService {
 }
 
 class MockMeetingService implements IMeetingService {
-  private meetings: Meeting[] = [...mockMeetings];
+  private getMeetingsData = () => loadLocalCollection('meetings', mockMeetings);
+  private saveMeetingsData = (meetings: Meeting[]) => saveLocalCollection('meetings', meetings);
 
   public async getMeetings(params?: ApiFilterParams & { participantUserId?: string }): Promise<ApiResponse<PagedResult<Meeting>>> {
-    let filtered = [...this.meetings];
+    let filtered = this.getMeetingsData();
+    const resolutions = loadLocalCollection('resolutions', mockResolutions);
 
     if (params?.participantUserId) {
       filtered = filtered.filter((meeting) =>
@@ -62,7 +65,7 @@ class MockMeetingService implements IMeetingService {
 
     // Refresh resolution count dynamically from mock resolutions
     filtered.forEach((m) => {
-      m.resolutionsCount = mockResolutions.filter((r) => r.meetingId === m.id).length;
+      m.resolutionsCount = resolutions.filter((r) => r.meetingId === m.id).length;
     });
 
     // Sort by date descending
@@ -84,15 +87,17 @@ class MockMeetingService implements IMeetingService {
   }
 
   public async getMeetingById(id: string): Promise<ApiResponse<Meeting | null>> {
-    const meeting = this.meetings.find((m) => m.id === id) || null;
+    const meeting = this.getMeetingsData().find((m) => m.id === id) || null;
     if (meeting) {
-      meeting.resolutionsCount = mockResolutions.filter((r) => r.meetingId === meeting.id).length;
+      const resolutions = loadLocalCollection('resolutions', mockResolutions);
+      meeting.resolutionsCount = resolutions.filter((r) => r.meetingId === meeting.id).length;
     }
     return apiClient.simulateNetwork(meeting, 120);
   }
 
   public async createMeeting(dto: CreateMeetingDto): Promise<ApiResponse<Meeting>> {
-    const nextNumber = this.meetings.length + 142;
+    const meetings = this.getMeetingsData();
+    const nextNumber = meetings.length + 142;
     const newMeeting: Meeting = {
       id: `meet-${Date.now()}`,
       meetingNumber: `جلسه-۱۴۰۳-${nextNumber}`,
@@ -118,23 +123,27 @@ class MockMeetingService implements IMeetingService {
       updatedAt: new Date().toISOString(),
     };
 
-    this.meetings.unshift(newMeeting);
+    meetings.unshift(newMeeting);
+    this.saveMeetingsData(meetings);
     return apiClient.simulateNetwork(newMeeting, 200);
   }
 
   public async updateMeeting(id: string, dto: Partial<Meeting>): Promise<ApiResponse<Meeting>> {
-    const index = this.meetings.findIndex((m) => m.id === id);
+    const meetings = this.getMeetingsData();
+    const index = meetings.findIndex((m) => m.id === id);
     if (index === -1) {
       throw new Error('جلسه یافت نشد');
     }
-    this.meetings[index] = { ...this.meetings[index], ...dto, updatedAt: new Date().toISOString() };
-    return apiClient.simulateNetwork(this.meetings[index], 150);
+    meetings[index] = { ...meetings[index], ...dto, updatedAt: new Date().toISOString() };
+    this.saveMeetingsData(meetings);
+    return apiClient.simulateNetwork(meetings[index], 150);
   }
 
   public async deleteMeeting(id: string): Promise<ApiResponse<boolean>> {
-    const initialLen = this.meetings.length;
-    this.meetings = this.meetings.filter((m) => m.id !== id);
-    return apiClient.simulateNetwork(this.meetings.length < initialLen, 150);
+    const meetings = this.getMeetingsData();
+    const next = meetings.filter((m) => m.id !== id);
+    this.saveMeetingsData(next);
+    return apiClient.simulateNetwork(next.length < meetings.length, 150);
   }
 
   public async updateMeetingStatus(id: string, status: MeetingStatus): Promise<ApiResponse<Meeting>> {

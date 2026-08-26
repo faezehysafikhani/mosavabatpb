@@ -5,12 +5,12 @@ import { UserRole } from '../../types';
 import { PostBankEmblem } from '../../components/common/PostBankLogo';
 
 export const LoginModal: React.FC = () => {
-  const { isLoginModalOpen, setIsLoginModalOpen, availableUsers, login, currentUser, showToast } = useApp();
+  const { isLoginModalOpen, setIsLoginModalOpen, availableUsers, login, showToast } = useApp();
   
   const [activeTab, setActiveTab] = useState<'QUICK_ROLE' | 'CREDENTIALS'>('QUICK_ROLE');
-  const [usernameInput, setUsernameInput] = useState('admin');
-  const [passwordInput, setPasswordInput] = useState('******');
-  const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id || 'user-admin');
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   if (!isLoginModalOpen) return null;
 
