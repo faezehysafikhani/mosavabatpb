@@ -19,7 +19,7 @@ export interface CreateMeetingDto {
 }
 
 export interface IMeetingService {
-  getMeetings(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Meeting>>>;
+  getMeetings(params?: ApiFilterParams & { participantUserId?: string }): Promise<ApiResponse<PagedResult<Meeting>>>;
   getMeetingById(id: string): Promise<ApiResponse<Meeting | null>>;
   createMeeting(dto: CreateMeetingDto): Promise<ApiResponse<Meeting>>;
   updateMeeting(id: string, dto: Partial<Meeting>): Promise<ApiResponse<Meeting>>;
@@ -30,8 +30,16 @@ export interface IMeetingService {
 class MockMeetingService implements IMeetingService {
   private meetings: Meeting[] = [...mockMeetings];
 
-  public async getMeetings(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Meeting>>> {
+  public async getMeetings(params?: ApiFilterParams & { participantUserId?: string }): Promise<ApiResponse<PagedResult<Meeting>>> {
     let filtered = [...this.meetings];
+
+    if (params?.participantUserId) {
+      filtered = filtered.filter((meeting) =>
+        meeting.organizerId === params.participantUserId ||
+        meeting.secretaryId === params.participantUserId ||
+        meeting.members.some((member) => member.userId === params.participantUserId)
+      );
+    }
 
     if (params?.searchTerm) {
       const term = params.searchTerm.toLowerCase();

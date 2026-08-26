@@ -58,8 +58,8 @@ export const DashboardView: React.FC = () => {
     try {
       const [kpiRes, meetingsRes, resRes, taskRes, apprRes] = await Promise.all([
         reportService.getDashboardKPIs(currentUser.id),
-        meetingService.getMeetings({ pageSize: 5 }),
-        resolutionService.getResolutions({ pageSize: 6 }),
+        meetingService.getMeetings({ pageSize: 5, participantUserId: currentUser.id }),
+        resolutionService.getResolutions({ pageSize: 6, relatedUserId: currentUser.id }),
         taskService.getMyTasks(currentUser.id, { pageSize: 4, status: 'IN_PROGRESS' }),
         approvalService.getMyApprovals(currentUser.id, { pageSize: 4, status: 'PENDING' }),
       ]);
@@ -85,10 +85,10 @@ export const DashboardView: React.FC = () => {
 
   // Status chart data matching Capture.PNG
   const statusData = [
-    { name: 'در حال انجام', value: kpis?.inProgressResolutions || 11, color: '#2563eb' },
-    { name: 'برنامه‌ریزی / شروع نشده', value: 5, color: '#f59e0b' },
-    { name: 'در انتظار صحه‌گذاری', value: kpis?.pendingApprovalResolutions || 2, color: '#a855f7' },
-    { name: 'خاتمه یافته', value: kpis?.completedClosedResolutions || 4, color: '#10b981' },
+    { name: 'در حال انجام', value: kpis?.inProgressResolutions ?? 0, color: '#2563eb' },
+    { name: 'برنامه‌ریزی / شروع نشده', value: kpis ? Math.max(0, kpis.totalResolutions - kpis.inProgressResolutions - kpis.pendingApprovalResolutions - kpis.completedClosedResolutions - kpis.overdueResolutions) : 0, color: '#f59e0b' },
+    { name: 'در انتظار صحه‌گذاری', value: kpis?.pendingApprovalResolutions ?? 0, color: '#a855f7' },
+    { name: 'خاتمه یافته', value: kpis?.completedClosedResolutions ?? 0, color: '#10b981' },
   ];
 
   // Department ownership data matching Capture.PNG horizontal bars
@@ -158,7 +158,7 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.totalMeetings || 16)}
+              {toPersianDigits(kpis?.totalMeetings ?? 0)}
             </div>
             <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
               فعال
@@ -179,7 +179,7 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.totalResolutions || 12)}
+              {toPersianDigits(kpis?.totalResolutions ?? 0)}
             </div>
             <span className="text-[11px] font-medium text-slate-400">
               ثبت‌شده
@@ -200,7 +200,7 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.inProgressResolutions || 11)}
+              {toPersianDigits(kpis?.inProgressResolutions ?? 0)}
             </div>
             <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
               در جریان
@@ -221,7 +221,7 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="flex items-baseline justify-between">
             <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.myPendingTasksCount || 4)}
+              {toPersianDigits(kpis?.myPendingTasksCount ?? 0)}
             </div>
             <span className="text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
               اقدام فوری

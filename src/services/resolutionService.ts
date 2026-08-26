@@ -12,6 +12,8 @@ import {
 } from '../types';
 import { mockResolutions, mockActivityLogs, mockTasks, mockApprovals } from '../mock/data';
 import { apiClient } from './api/apiClient';
+import { mockUsers } from '../mock/data';
+import { isResolutionRelatedToUser } from './userScope';
 
 export interface CreateResolutionDto {
   meetingId: string;
@@ -41,7 +43,7 @@ export interface CreateResolutionDto {
 }
 
 export interface IResolutionService {
-  getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string }): Promise<ApiResponse<PagedResult<Resolution>>>;
+  getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; relatedUserId?: string }): Promise<ApiResponse<PagedResult<Resolution>>>;
   getResolutionById(id: string): Promise<ApiResponse<Resolution | null>>;
   createResolution(dto: CreateResolutionDto): Promise<ApiResponse<Resolution>>;
   updateResolution(id: string, dto: Partial<Resolution>): Promise<ApiResponse<Resolution>>;
@@ -56,8 +58,13 @@ class MockResolutionService implements IResolutionService {
   private resolutions: Resolution[] = [...mockResolutions];
   private activityLogs: ActivityLog[] = [...mockActivityLogs];
 
-  public async getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; requiresVerification?: boolean }): Promise<ApiResponse<PagedResult<Resolution>>> {
+  public async getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; requiresVerification?: boolean; relatedUserId?: string }): Promise<ApiResponse<PagedResult<Resolution>>> {
     let filtered = [...this.resolutions];
+
+    if (params?.relatedUserId) {
+      const relatedUser = mockUsers.find((user) => user.id === params.relatedUserId);
+      filtered = relatedUser ? filtered.filter((resolution) => isResolutionRelatedToUser(resolution, relatedUser)) : [];
+    }
 
     if (params?.searchTerm) {
       const term = params.searchTerm.toLowerCase();

@@ -16,7 +16,7 @@ class MockApprovalService implements IApprovalService {
   public async getMyApprovals(userId?: string, params?: ApiFilterParams): Promise<ApiResponse<PagedResult<ApprovalCartableItem>>> {
     let filtered = [...this.approvals];
 
-    if (userId && userId !== 'user-15' && userId !== 'user-1') {
+    if (userId) {
       filtered = filtered.filter((a) => a.assignedApproverId === userId);
     }
 

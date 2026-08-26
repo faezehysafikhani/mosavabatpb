@@ -16,9 +16,9 @@ class MockTaskService implements ITaskService {
   public async getMyTasks(userId?: string, params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Task>>> {
     let filtered = [...this.tasks];
 
-    // If userId provided, filter by assigned user (or if admin, can view all)
+    // A personal cartable always contains only tasks assigned to the active user.
     if (userId) {
-      filtered = filtered.filter((t) => t.assignedToUserId === userId || userId === 'user-15' || userId === 'user-1');
+      filtered = filtered.filter((t) => t.assignedToUserId === userId);
     }
 
     if (params?.searchTerm) {

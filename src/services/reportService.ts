@@ -1,6 +1,7 @@
 import { DashboardKPIs, DepartmentPerformance, ApiResponse } from '../types';
-import { mockMeetings, mockResolutions, mockTasks, mockApprovals, mockDepartments } from '../mock/data';
+import { mockMeetings, mockResolutions, mockTasks, mockApprovals, mockDepartments, mockUsers } from '../mock/data';
 import { apiClient } from './api/apiClient';
+import { isMeetingRelatedToUser, isResolutionRelatedToUser } from './userScope';
 
 export interface MonthlyMeetingTrend {
   month: string;
@@ -26,12 +27,20 @@ export interface IReportService {
 
 class MockReportService implements IReportService {
   public async getDashboardKPIs(currentUserId?: string): Promise<ApiResponse<DashboardKPIs>> {
-    const totalMeetings = mockMeetings.length;
-    const totalResolutions = mockResolutions.length;
-    const inProgressResolutions = mockResolutions.filter((r) => r.executionStatus === 'IN_PROGRESS').length;
-    const completedClosedResolutions = mockResolutions.filter((r) => r.executionStatus === 'APPROVED_CLOSED').length;
-    const pendingApprovalResolutions = mockResolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length;
-    const overdueResolutions = mockResolutions.filter((r) => r.executionStatus === 'OVERDUE').length;
+    const currentUser = mockUsers.find((user) => user.id === currentUserId);
+    const scopedMeetings = currentUserId
+      ? mockMeetings.filter((meeting) => isMeetingRelatedToUser(meeting, currentUserId))
+      : mockMeetings;
+    const scopedResolutions = currentUser
+      ? mockResolutions.filter((resolution) => isResolutionRelatedToUser(resolution, currentUser))
+      : currentUserId ? [] : mockResolutions;
+
+    const totalMeetings = scopedMeetings.length;
+    const totalResolutions = scopedResolutions.length;
+    const inProgressResolutions = scopedResolutions.filter((r) => r.executionStatus === 'IN_PROGRESS').length;
+    const completedClosedResolutions = scopedResolutions.filter((r) => r.executionStatus === 'APPROVED_CLOSED').length;
+    const pendingApprovalResolutions = scopedResolutions.filter((r) => r.executionStatus === 'PENDING_APPROVAL').length;
+    const overdueResolutions = scopedResolutions.filter((r) => r.executionStatus === 'OVERDUE').length;
 
     const myPendingTasksCount = mockTasks.filter(
       (t) => (t.assignedToUserId === currentUserId || !currentUserId) && (t.status === 'IN_PROGRESS' || t.status === 'NEW' || t.status === 'OVERDUE')

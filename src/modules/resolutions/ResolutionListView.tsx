@@ -25,7 +25,7 @@ import { ListViewActions, ListViewMode } from '../../components/common/ListViewA
 import { exportListToPdf } from '../../utils/pdfExport';
 
 export const ResolutionListView: React.FC = () => {
-  const { showToast, refreshTrigger, selectedResolutionId, setSelectedResolutionId } = useApp();
+  const { showToast, refreshTrigger, selectedResolutionId, setSelectedResolutionId, currentUser } = useApp();
 
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +39,7 @@ export const ResolutionListView: React.FC = () => {
 
   useEffect(() => {
     fetchResolutions();
-  }, [searchTerm, executionFilter, departmentFilter, refreshTrigger]);
+  }, [searchTerm, executionFilter, departmentFilter, refreshTrigger, currentUser.id]);
 
   const fetchResolutions = async () => {
     setLoading(true);
@@ -48,6 +48,7 @@ export const ResolutionListView: React.FC = () => {
         searchTerm,
         executionStatus: executionFilter,
         departmentId: departmentFilter,
+        relatedUserId: currentUser.id,
         pageSize: 50,
       });
       if (res.isSuccess) {

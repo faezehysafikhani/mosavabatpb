@@ -23,7 +23,7 @@ import { ListViewActions, ListViewMode } from '../../components/common/ListViewA
 import { exportListToPdf } from '../../utils/pdfExport';
 
 export const MeetingListView: React.FC = () => {
-  const { navigateTo, setIsCreateMeetingOpen, showToast, refreshTrigger } = useApp();
+  const { navigateTo, setIsCreateMeetingOpen, showToast, refreshTrigger, currentUser } = useApp();
   
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -36,7 +36,7 @@ export const MeetingListView: React.FC = () => {
 
   useEffect(() => {
     fetchMeetings();
-  }, [searchTerm, statusFilter, departmentFilter, refreshTrigger]);
+  }, [searchTerm, statusFilter, departmentFilter, refreshTrigger, currentUser.id]);
 
   const fetchMeetings = async () => {
     setLoading(true);
@@ -45,6 +45,7 @@ export const MeetingListView: React.FC = () => {
         searchTerm,
         status: statusFilter,
         departmentId: departmentFilter,
+        participantUserId: currentUser.id,
         pageSize: 50,
       });
       if (res.isSuccess) {

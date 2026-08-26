@@ -185,8 +185,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const hasPermission = (permission: string): boolean => {
     if (!currentUser) return false;
-    // Item 1: My tasks should be visible and accessible to all users
-    if (permission === 'VIEW_TASKS') return true;
+    // Every authenticated user can access personal meetings, resolutions, tasks and approvals.
+    if (['VIEW_MEETINGS', 'VIEW_RESOLUTIONS', 'VIEW_TASKS', 'VIEW_APPROVALS'].includes(permission)) return true;
     if (currentUser.role === 'ADMIN') return true;
     if (currentUser.permissions?.includes('VIEW_ALL') || currentUser.permissions?.includes('APPROVE_ALL')) {
       if (permission.startsWith('VIEW_')) return true;
