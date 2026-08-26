@@ -133,7 +133,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-start shrink-0 z-30 h-full select-none shadow-xs ${
+      className={`app-surface bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-start shrink-0 z-30 h-full select-none shadow-xs ${
         isSidebarCollapsed ? 'w-16' : 'w-60'
       }`}
     >
@@ -188,7 +188,7 @@ export const Sidebar: React.FC = () => {
           <div key={group.id} className="space-y-0.5">
             {/* Group Header */}
             {!isSidebarCollapsed ? (
-              <div className="px-2 pt-1 pb-0.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              <div className="px-2 pt-1.5 pb-1 text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                 {group.title}
               </div>
             ) : (
@@ -214,8 +214,8 @@ export const Sidebar: React.FC = () => {
                     title={item.title}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-teal-800 text-white font-bold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-medium'
+                        ? 'app-nav-active text-white font-extrabold shadow-xs'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white font-bold'
                     } ${isSidebarCollapsed ? 'justify-center px-1 py-1.5' : ''}`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -225,7 +225,7 @@ export const Sidebar: React.FC = () => {
                         }`}
                       />
                       {!isSidebarCollapsed && (
-                        <span className="truncate text-[11px]">{item.title}</span>
+                        <span className="truncate text-[12px] leading-5">{item.title}</span>
                       )}
                     </div>
 

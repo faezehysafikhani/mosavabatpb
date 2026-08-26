@@ -21,6 +21,8 @@ import { toPersianDigits, getResolutionApprovalMeta, getResolutionExecutionMeta,
 import { mockDepartments } from '../../mock/data';
 import { CreateResolutionModal } from './CreateResolutionModal';
 import { ResolutionDetailModal } from './ResolutionDetailModal';
+import { ListViewActions, ListViewMode } from '../../components/common/ListViewActions';
+import { exportListToPdf } from '../../utils/pdfExport';
 
 export const ResolutionListView: React.FC = () => {
   const { showToast, refreshTrigger, selectedResolutionId, setSelectedResolutionId } = useApp();
@@ -32,6 +34,8 @@ export const ResolutionListView: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeModalResId, setActiveModalResId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
 
   useEffect(() => {
     fetchResolutions();
@@ -56,8 +60,17 @@ export const ResolutionListView: React.FC = () => {
     }
   };
 
-  const handleExportExcel = () => {
-    showToast('خروجی اکسل', 'فایل اکسل جامع مصوبات سازمان آماده دریافت شد.', 'info');
+  const handleExportPdf = () => {
+    const opened = exportListToPdf<Resolution>('بانک مصوبات سازمانی', resolutions, [
+      { title: 'شماره مصوبه', value: (item) => item.resolutionNumber },
+      { title: 'عنوان', value: (item) => item.topicTitle },
+      { title: 'جلسه', value: (item) => item.meetingTitle },
+      { title: 'مسئول', value: (item) => item.mainResponsibleName || 'نامشخص' },
+      { title: 'واحد', value: (item) => item.responsibleDepartmentName },
+      { title: 'مهلت', value: (item) => toPersianDigits(item.deadlineJalali || '—') },
+      { title: 'وضعیت', value: (item) => getResolutionExecutionMeta(item.executionStatus).label },
+    ]);
+    showToast(opened ? 'خروجی PDF' : 'خطای خروجی', opened ? 'پنجره ذخیره PDF بانک مصوبات باز شد.' : 'مرورگر اجازه باز شدن پنجره PDF را نداد.', opened ? 'success' : 'error');
   };
 
   return (
@@ -75,13 +88,7 @@ export const ResolutionListView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleExportExcel}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
-          >
-            <FileDown className="w-3.5 h-3.5 text-slate-600" />
-            <span>خروجی اکسل</span>
-          </button>
+          <ListViewActions filtersOpen={filtersOpen} onToggleFilters={() => setFiltersOpen((value) => !value)} viewMode={viewMode} onViewModeChange={setViewMode} onExportPdf={handleExportPdf} />
 
           <button
             onClick={() => setIsCreateModalOpen(true)}
@@ -94,7 +101,7 @@ export const ResolutionListView: React.FC = () => {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {filtersOpen && <div className="app-panel bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-2">
         <div className="relative">
           <input
             type="text"
@@ -133,10 +140,10 @@ export const ResolutionListView: React.FC = () => {
             ))}
           </select>
         </div>
-      </div>
+      </div>}
 
       {/* Resolutions Grid */}
-      <div className="space-y-3">
+      {viewMode === 'cards' ? <div className="space-y-3">
         {resolutions.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-100 shadow-xs">
             <FileCheck2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -210,7 +217,16 @@ export const ResolutionListView: React.FC = () => {
             );
           })
         )}
-      </div>
+      </div> : (
+        <div className="app-panel bg-white rounded-2xl border border-slate-100 shadow-xs overflow-x-auto">
+          <table className="w-full min-w-[900px] text-xs text-right">
+            <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">شماره</th><th className="p-3">عنوان مصوبه</th><th className="p-3">مسئول / واحد</th><th className="p-3">مهلت</th><th className="p-3">مرجع جلسه</th><th className="p-3">وضعیت</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {resolutions.map((res) => { const meta = getResolutionExecutionMeta(res.executionStatus); return <tr key={res.id} onClick={() => setActiveModalResId(res.id)} className="hover:bg-slate-50 cursor-pointer transition-colors"><td className="p-3 font-bold text-blue-700">{res.resolutionNumber}</td><td className="p-3 font-bold text-slate-800">{res.topicTitle}</td><td className="p-3 text-slate-600">{res.mainResponsibleName || 'نامشخص'}<div className="text-[10px] text-slate-400">{res.responsibleDepartmentName}</div></td><td className="p-3">{toPersianDigits(res.deadlineJalali || '—')}</td><td className="p-3 text-slate-600">{res.meetingTitle}</td><td className="p-3"><span className={`px-2 py-1 rounded-full border font-bold ${meta.bg}`}>{meta.label}</span></td></tr>; })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Create Resolution Modal */}
       <CreateResolutionModal

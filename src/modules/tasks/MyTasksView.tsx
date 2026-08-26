@@ -17,6 +17,8 @@ import { taskService } from '../../services/taskService';
 import { Task } from '../../types';
 import { toPersianDigits, getPriorityMeta } from '../../utils/formatters';
 import { ResolutionDetailModal } from '../resolutions/ResolutionDetailModal';
+import { ListViewActions, ListViewMode } from '../../components/common/ListViewActions';
+import { exportListToPdf } from '../../utils/pdfExport';
 
 export const MyTasksView: React.FC = () => {
   const { currentUser, showToast, refreshTrigger } = useApp();
@@ -26,6 +28,8 @@ export const MyTasksView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
 
   // Complete task modal state
   const [activeCompletingTask, setActiveCompletingTask] = useState<Task | null>(null);
@@ -105,6 +109,19 @@ export const MyTasksView: React.FC = () => {
     }
   };
 
+  const handleExportPdf = () => {
+    const opened = exportListToPdf<Task>('لیست وظایف ارجاعی من', tasks, [
+      { title: 'شماره مصوبه', value: (item) => item.resolutionNumber },
+      { title: 'عنوان وظیفه', value: (item) => item.resolutionTitle },
+      { title: 'جلسه', value: (item) => item.meetingTitle },
+      { title: 'تاریخ ارجاع', value: (item) => toPersianDigits(item.referralDateJalali) },
+      { title: 'مهلت', value: (item) => toPersianDigits(item.deadlineJalali) },
+      { title: 'اولویت', value: (item) => getPriorityMeta(item.priority).label },
+      { title: 'وضعیت', value: (item) => getTaskStatusBadge(item.status).label },
+    ]);
+    showToast(opened ? 'خروجی PDF' : 'خطای خروجی', opened ? 'پنجره ذخیره PDF وظایف باز شد.' : 'مرورگر اجازه باز شدن پنجره PDF را نداد.', opened ? 'success' : 'error');
+  };
+
   return (
     <div className="space-y-5 pb-12">
       {/* Header */}
@@ -118,10 +135,11 @@ export const MyTasksView: React.FC = () => {
             تکالیف ارجاع‌شده از مصوبات جلسات به کاربر: <strong className="text-slate-700">{currentUser.fullName}</strong>
           </p>
         </div>
+        <ListViewActions filtersOpen={filtersOpen} onToggleFilters={() => setFiltersOpen((value) => !value)} viewMode={viewMode} onViewModeChange={setViewMode} onExportPdf={handleExportPdf} />
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {filtersOpen && <div className="app-panel bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2">
         <div className="relative">
           <input
             type="text"
@@ -146,10 +164,10 @@ export const MyTasksView: React.FC = () => {
             <option value="CLOSED">خاتمه یافته (Closed)</option>
           </select>
         </div>
-      </div>
+      </div>}
 
       {/* Tasks List */}
-      <div className="space-y-3">
+      {viewMode === 'cards' ? <div className="space-y-3">
         {tasks.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-100 shadow-xs">
             <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -224,7 +242,16 @@ export const MyTasksView: React.FC = () => {
             );
           })
         )}
-      </div>
+      </div> : (
+        <div className="app-panel bg-white rounded-2xl border border-slate-100 shadow-xs overflow-x-auto">
+          <table className="w-full min-w-[850px] text-xs text-right">
+            <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">شماره</th><th className="p-3">عنوان وظیفه</th><th className="p-3">جلسه</th><th className="p-3">مهلت</th><th className="p-3">اولویت</th><th className="p-3">وضعیت</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {tasks.map((task) => { const status = getTaskStatusBadge(task.status); return <tr key={task.id} onClick={() => setSelectedResolutionId(task.resolutionId)} className="hover:bg-slate-50 cursor-pointer transition-colors"><td className="p-3 font-bold text-blue-700">{task.resolutionNumber}</td><td className="p-3 font-bold text-slate-800">{task.resolutionTitle}</td><td className="p-3 text-slate-600">{task.meetingTitle}</td><td className="p-3">{toPersianDigits(task.deadlineJalali)}</td><td className="p-3">{getPriorityMeta(task.priority).label}</td><td className="p-3"><span className={`px-2 py-1 rounded-full border font-bold ${status.bg}`}>{status.label}</span></td></tr>; })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Completion Modal */}
       {activeCompletingTask && (

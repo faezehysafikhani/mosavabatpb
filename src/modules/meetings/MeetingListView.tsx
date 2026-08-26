@@ -19,6 +19,8 @@ import { meetingService } from '../../services/meetingService';
 import { Meeting, MeetingStatus } from '../../types';
 import { toPersianDigits, getMeetingTypeLabel, getMeetingStatusMeta } from '../../utils/formatters';
 import { mockDepartments } from '../../mock/data';
+import { ListViewActions, ListViewMode } from '../../components/common/ListViewActions';
+import { exportListToPdf } from '../../utils/pdfExport';
 
 export const MeetingListView: React.FC = () => {
   const { navigateTo, setIsCreateMeetingOpen, showToast, refreshTrigger } = useApp();
@@ -29,6 +31,8 @@ export const MeetingListView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
 
   useEffect(() => {
     fetchMeetings();
@@ -55,7 +59,16 @@ export const MeetingListView: React.FC = () => {
   };
 
   const handleExportList = () => {
-    showToast('خروجی اکسل', 'فایل اکسل لیست جلسات با موفقیت تولید شد.', 'info');
+    const opened = exportListToPdf<Meeting>('لیست مدیریت جلسات', meetings, [
+      { title: 'شماره جلسه', value: (item) => item.meetingNumber },
+      { title: 'عنوان', value: (item) => item.title },
+      { title: 'تاریخ', value: (item) => toPersianDigits(item.dateJalali) },
+      { title: 'ساعت', value: (item) => `${toPersianDigits(item.startTime)} تا ${toPersianDigits(item.endTime)}` },
+      { title: 'مکان', value: (item) => item.location },
+      { title: 'تعداد مصوبات', value: (item) => toPersianDigits(item.resolutionsCount) },
+      { title: 'وضعیت', value: (item) => getMeetingStatusMeta(item.status).label },
+    ]);
+    showToast(opened ? 'خروجی PDF' : 'خطای خروجی', opened ? 'پنجره ذخیره PDF لیست جلسات باز شد.' : 'مرورگر اجازه باز شدن پنجره PDF را نداد.', opened ? 'success' : 'error');
   };
 
   return (
@@ -73,13 +86,7 @@ export const MeetingListView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleExportList}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
-          >
-            <FileDown className="w-3.5 h-3.5 text-slate-600" />
-            <span>خروجی لیست</span>
-          </button>
+          <ListViewActions filtersOpen={filtersOpen} onToggleFilters={() => setFiltersOpen((value) => !value)} viewMode={viewMode} onViewModeChange={setViewMode} onExportPdf={handleExportList} />
 
           <button
             onClick={() => setIsCreateMeetingOpen(true)}
@@ -92,7 +99,7 @@ export const MeetingListView: React.FC = () => {
       </div>
 
       {/* Filter and Search Toolbar */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {filtersOpen && <div className="app-panel bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-2">
         {/* Search */}
         <div className="relative">
           <input
@@ -133,10 +140,10 @@ export const MeetingListView: React.FC = () => {
             ))}
           </select>
         </div>
-      </div>
+      </div>}
 
       {/* Meetings List Cards */}
-      <div className="space-y-3">
+      {viewMode === 'cards' ? <div className="space-y-3">
         {meetings.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-100 shadow-xs">
             <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -213,7 +220,19 @@ export const MeetingListView: React.FC = () => {
             );
           })
         )}
-      </div>
+      </div> : (
+        <div className="app-panel bg-white rounded-2xl border border-slate-100 shadow-xs overflow-x-auto">
+          <table className="w-full min-w-[850px] text-xs text-right">
+            <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">شماره</th><th className="p-3">عنوان جلسه</th><th className="p-3">تاریخ و ساعت</th><th className="p-3">مکان</th><th className="p-3">مصوبات</th><th className="p-3">وضعیت</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {meetings.map((meeting) => {
+                const statusMeta = getMeetingStatusMeta(meeting.status);
+                return <tr key={meeting.id} onClick={() => navigateTo('meeting-details', { meetingId: meeting.id })} className="hover:bg-slate-50 cursor-pointer transition-colors"><td className="p-3 font-bold text-blue-700">{meeting.meetingNumber}</td><td className="p-3 font-bold text-slate-800">{meeting.title}</td><td className="p-3 text-slate-600">{toPersianDigits(meeting.dateJalali)}، {toPersianDigits(meeting.startTime)}</td><td className="p-3 text-slate-600">{meeting.location}</td><td className="p-3">{toPersianDigits(meeting.resolutionsCount)}</td><td className="p-3"><span className={`px-2 py-1 rounded-full border font-bold ${statusMeta.bg}`}>{statusMeta.label}</span></td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

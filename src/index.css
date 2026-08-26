@@ -12,6 +12,14 @@
     font-size: 17px;
   }
 
+  :root {
+    --app-primary: #b0126b;
+    --app-primary-strong: #541d50;
+    --app-accent: #e40068;
+    --app-page: #fff8fc;
+    --app-surface: rgba(255, 255, 255, 0.96);
+  }
+
   body {
     background-color: #ffffff !important;
     color: #0f172a;
@@ -35,6 +43,78 @@
     background-color: #020617 !important;
     color: #f8fafc;
   }
+}
+
+.theme-brand {
+  --app-primary: #b0126b;
+  --app-primary-strong: #4a1e4c;
+  --app-accent: #e40068;
+  --app-page: #fff8fc;
+  --app-surface: rgba(255, 255, 255, 0.97);
+}
+
+.theme-glass {
+  --app-primary: #1677ff;
+  --app-primary-strong: #0756b6;
+  --app-accent: #38bdf8;
+  --app-page: #eaf6ff;
+  --app-surface: rgba(255, 255, 255, 0.7);
+}
+
+.app-shell,
+.app-main {
+  background: var(--app-page) !important;
+}
+
+.app-surface {
+  background: var(--app-surface) !important;
+}
+
+.app-nav-active,
+.app-primary-button {
+  background: linear-gradient(135deg, var(--app-primary), var(--app-primary-strong)) !important;
+}
+
+.app-primary-button:hover {
+  filter: brightness(0.94);
+}
+
+.theme-brand .text-blue-600,
+.theme-brand .text-blue-700,
+.theme-brand .text-blue-900,
+.theme-brand .text-teal-700,
+.theme-brand .text-teal-800 {
+  color: var(--app-primary) !important;
+}
+
+.theme-brand .bg-blue-600,
+.theme-brand .bg-blue-700,
+.theme-brand .bg-teal-700,
+.theme-brand .bg-teal-800 {
+  background-color: var(--app-primary) !important;
+}
+
+.theme-glass body,
+.theme-glass .app-shell,
+.theme-glass .app-main {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(56, 189, 248, 0.22), transparent 32%),
+    radial-gradient(circle at 85% 75%, rgba(37, 99, 235, 0.16), transparent 34%),
+    linear-gradient(145deg, #edf8ff 0%, #f8fbff 48%, #e7f2ff 100%) !important;
+  background-attachment: fixed !important;
+}
+
+.theme-glass .app-surface,
+.theme-glass .app-panel {
+  background: rgba(255, 255, 255, 0.68) !important;
+  border-color: rgba(125, 181, 231, 0.36) !important;
+  box-shadow: 0 10px 35px rgba(30, 100, 180, 0.09) !important;
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.theme-brand .app-panel {
+  border-color: rgba(176, 18, 107, 0.12) !important;
+  box-shadow: 0 8px 24px rgba(98, 26, 82, 0.06) !important;
 }
 
 /* Custom smooth scrollbar */

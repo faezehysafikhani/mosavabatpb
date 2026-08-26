@@ -17,6 +17,9 @@ import {
   Check,
   Trash2,
   Inbox
+  ,Palette
+  ,Droplets
+  ,Clock3
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
@@ -37,21 +40,34 @@ export const Navbar: React.FC = () => {
     navigateTo,
     setIsLoginModalOpen,
     showToast,
-    isDarkMode,
-    toggleDarkMode
+    appTheme,
+    setAppTheme
   } = useApp();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationTab, setNotificationTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [now, setNow] = useState(new Date());
   const todayJalali = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
+  }).format(now);
+  const currentTime = new Intl.DateTimeFormat('fa-IR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(now);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -61,6 +77,9 @@ export const Navbar: React.FC = () => {
       }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
+        setShowThemeMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -84,10 +103,10 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-40 shadow-xs select-none">
+    <header className="app-surface h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-40 shadow-xs select-none">
       <div className="w-full flex items-center justify-between gap-4">
         
-        {/* Right side: App Title & Toggle & Post Bank Iran Logo */}
+        {/* Right side: App Title & Toggle & Organization Logo */}
         <div className="flex items-center gap-3">
           <button 
             onClick={toggleSidebar}
@@ -102,9 +121,9 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-2.5 cursor-pointer select-none"
           >
             <img
-              src="/postbank.png"
-              alt="لوگوی پست بانک ایران"
-              className="w-12 h-12 object-contain rounded-lg bg-white shrink-0"
+              src="/pars-project.png"
+              alt="لوگوی Pars Project"
+              className="w-12 h-12 object-contain rounded-xl bg-white shrink-0 p-0.5 border border-slate-100"
             />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
@@ -139,7 +158,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Left side: Role switcher, current date, Notifications, Theme switch, User Profile */}
+        {/* Left side: Role switcher, Notifications, Theme switch, User Profile, Date & Time */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           
           {/* Quick Role Switcher */}
@@ -186,14 +205,6 @@ export const Navbar: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-
-          <div
-            className="hidden sm:flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700"
-            title="تاریخ امروز"
-          >
-            <Calendar className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
-            <span>امروز: {todayJalali}</span>
           </div>
 
           {/* Notifications Dropdown (Item 5 Fixed) */}
@@ -314,14 +325,34 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Dark mode toggle (Item 4 Fixed) */}
-          <button 
-            onClick={toggleDarkMode}
-            className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title={isDarkMode ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک'}
-          >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-          </button>
+          {/* Theme selector */}
+          <div className="relative" ref={themeMenuRef}>
+            <button
+              onClick={() => setShowThemeMenu((prev) => !prev)}
+              className="p-2 text-slate-500 dark:text-slate-400 hover:text-[var(--app-primary)] rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title="انتخاب تم سامانه"
+            >
+              {appTheme === 'glass' ? <Droplets className="w-4 h-4 text-sky-500" /> : appTheme === 'dark' ? <Moon className="w-4 h-4" /> : <Palette className="w-4 h-4 text-fuchsia-700" />}
+            </button>
+            {showThemeMenu && (
+              <div className="app-surface absolute left-0 mt-2 w-44 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-1.5 z-50">
+                {[
+                  { id: 'brand', label: 'تم سازمانی', icon: Palette },
+                  { id: 'glass', label: 'آبی شیشه‌ای', icon: Droplets },
+                  { id: 'dark', label: 'تم تیره', icon: Moon },
+                ].map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => { setAppTheme(id as 'brand' | 'glass' | 'dark'); setShowThemeMenu(false); }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-colors ${appTheme === id ? 'app-nav-active text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Logout / Switch User */}
           <button
@@ -331,6 +362,17 @@ export const Navbar: React.FC = () => {
           >
             <LogOut className="w-4 h-4" />
           </button>
+
+          <div
+            className="hidden xl:flex items-center gap-2 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700 whitespace-nowrap"
+            title="تاریخ و ساعت جاری"
+          >
+            <Calendar className="w-3.5 h-3.5 text-[var(--app-primary)]" />
+            <span>{todayJalali}</span>
+            <span className="w-px h-3 bg-slate-300 dark:bg-slate-600" />
+            <Clock3 className="w-3.5 h-3.5 text-[var(--app-primary)]" />
+            <span dir="ltr">{currentTime}</span>
+          </div>
         </div>
       </div>
     </header>

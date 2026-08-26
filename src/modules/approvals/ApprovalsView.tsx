@@ -18,6 +18,8 @@ import { approvalService } from '../../services/approvalService';
 import { ApprovalCartableItem } from '../../types';
 import { toPersianDigits } from '../../utils/formatters';
 import { ResolutionDetailModal } from '../resolutions/ResolutionDetailModal';
+import { ListViewActions, ListViewMode } from '../../components/common/ListViewActions';
+import { exportListToPdf } from '../../utils/pdfExport';
 
 export const ApprovalsView: React.FC = () => {
   const { currentUser, showToast, refreshTrigger } = useApp();
@@ -27,6 +29,8 @@ export const ApprovalsView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
 
   // Approval/Rejection action state
   const [activeItem, setActiveItem] = useState<ApprovalCartableItem | null>(null);
@@ -92,6 +96,23 @@ export const ApprovalsView: React.FC = () => {
     }
   };
 
+  const getApprovalStatusLabel = (status: ApprovalCartableItem['status']) => status === 'PENDING'
+    ? 'نیازمند بررسی و صحه‌گذاری'
+    : status === 'APPROVED' ? 'تایید شده' : 'عدم تایید';
+
+  const handleExportPdf = () => {
+    const opened = exportListToPdf<ApprovalCartableItem>('لیست کارتابل صحه‌گذاری', approvals, [
+      { title: 'شماره مصوبه', value: (item) => item.resolutionNumber },
+      { title: 'عنوان', value: (item) => item.resolutionTitle },
+      { title: 'مجری', value: (item) => item.responsibleName },
+      { title: 'واحد', value: (item) => item.responsibleDepartment },
+      { title: 'تاریخ ارسال', value: (item) => toPersianDigits(item.submittedForApprovalDateJalali) },
+      { title: 'مرحله', value: (item) => `${toPersianDigits(item.stepNumber)} از ${toPersianDigits(item.totalSteps)}` },
+      { title: 'وضعیت', value: (item) => getApprovalStatusLabel(item.status) },
+    ]);
+    showToast(opened ? 'خروجی PDF' : 'خطای خروجی', opened ? 'پنجره ذخیره PDF کارتابل صحه‌گذاری باز شد.' : 'مرورگر اجازه باز شدن پنجره PDF را نداد.', opened ? 'success' : 'error');
+  };
+
   return (
     <div className="space-y-5 pb-12">
       {/* Header */}
@@ -105,10 +126,11 @@ export const ApprovalsView: React.FC = () => {
             بررسی گزارش‌های اتمام اقدام مجریان و اعلام نظر تایید یا بازگشت جهت اصلاح
           </p>
         </div>
+        <ListViewActions filtersOpen={filtersOpen} onToggleFilters={() => setFiltersOpen((value) => !value)} viewMode={viewMode} onViewModeChange={setViewMode} onExportPdf={handleExportPdf} />
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {filtersOpen && <div className="app-panel bg-white rounded-2xl p-4 shadow-xs border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2">
         <div className="relative">
           <input
             type="text"
@@ -132,10 +154,10 @@ export const ApprovalsView: React.FC = () => {
             <option value="REJECTED">عدم تایید و بازگردانده شده (Rejected)</option>
           </select>
         </div>
-      </div>
+      </div>}
 
       {/* Approvals List */}
-      <div className="space-y-3">
+      {viewMode === 'cards' ? <div className="space-y-3">
         {approvals.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-100 shadow-xs">
             <ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -220,7 +242,16 @@ export const ApprovalsView: React.FC = () => {
             );
           })
         )}
-      </div>
+      </div> : (
+        <div className="app-panel bg-white rounded-2xl border border-slate-100 shadow-xs overflow-x-auto">
+          <table className="w-full min-w-[900px] text-xs text-right">
+            <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">شماره</th><th className="p-3">عنوان مصوبه</th><th className="p-3">مجری / واحد</th><th className="p-3">تاریخ ارسال</th><th className="p-3">مرحله</th><th className="p-3">وضعیت</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {approvals.map((item) => <tr key={item.id} onClick={() => setSelectedResolutionId(item.resolutionId)} className="hover:bg-slate-50 cursor-pointer transition-colors"><td className="p-3 font-bold text-blue-700">{item.resolutionNumber}</td><td className="p-3 font-bold text-slate-800">{item.resolutionTitle}</td><td className="p-3 text-slate-600">{item.responsibleName}<div className="text-[10px] text-slate-400">{item.responsibleDepartment}</div></td><td className="p-3">{toPersianDigits(item.submittedForApprovalDateJalali)}</td><td className="p-3">{toPersianDigits(item.stepNumber)} از {toPersianDigits(item.totalSteps)}</td><td className="p-3 font-bold">{getApprovalStatusLabel(item.status)}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Action Modal */}
       {activeItem && (

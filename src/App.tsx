@@ -61,7 +61,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 flex flex-col text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-teal-700 selection:text-white" dir="rtl">
+    <div className="app-shell min-h-screen bg-white dark:bg-slate-950 flex flex-col text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-[var(--app-primary)] selection:text-white" dir="rtl">
       {/* Top Navbar */}
       <Navbar />
 
@@ -71,7 +71,7 @@ const AppContent: React.FC = () => {
         <Sidebar />
 
         {/* Main Content Area */}
-        <main className={`flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6 bg-white dark:bg-slate-950 ${currentRoute === 'calendar' ? 'overflow-hidden' : ''}`}>
+        <main className={`app-main flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6 bg-white dark:bg-slate-950 ${currentRoute === 'calendar' ? 'overflow-hidden' : ''}`}>
           <div className="max-w-7xl mx-auto h-full">
             {renderCurrentView()}
           </div>

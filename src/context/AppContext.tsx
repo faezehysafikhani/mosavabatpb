@@ -16,6 +16,8 @@ export type AppRoute =
   | 'settings'
   | 'guide';
 
+export type AppTheme = 'brand' | 'glass' | 'dark';
+
 interface ToastInfo {
   id: string;
   type: 'success' | 'error' | 'info' | 'warning';
@@ -73,6 +75,8 @@ interface AppContextType {
   triggerRefresh: () => void;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  appTheme: AppTheme;
+  setAppTheme: (theme: AppTheme) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -93,36 +97,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [createMeetingInitialDate, setCreateMeetingInitialDate] = useState<string>('۱۴۰۳/۰۷/۰۵');
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [appTheme, setAppThemeState] = useState<AppTheme>('brand');
+  const isDarkMode = appTheme === 'dark';
   const [resolutionModalState, setResolutionModalState] = useState<CreateResolutionModalState>({
     isOpen: false,
   });
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
-  // Initialize Dark Mode from localStorage
+  const applyTheme = (theme: AppTheme) => {
+    document.documentElement.classList.remove('dark', 'theme-brand', 'theme-glass');
+    document.documentElement.classList.add(theme === 'dark' ? 'dark' : `theme-${theme}`);
+  };
+
+  // Initialize selected visual theme from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('app-theme');
-    if (savedTheme === 'dark') {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
-    } else {
-      setIsDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    }
+    const initialTheme: AppTheme = savedTheme === 'dark' || savedTheme === 'glass' || savedTheme === 'brand'
+      ? savedTheme
+      : 'brand';
+    setAppThemeState(initialTheme);
+    applyTheme(initialTheme);
   }, []);
 
+  const setAppTheme = (theme: AppTheme) => {
+    setAppThemeState(theme);
+    applyTheme(theme);
+    localStorage.setItem('app-theme', theme);
+  };
+
   const toggleDarkMode = () => {
-    setIsDarkMode((prev) => {
-      const next = !prev;
-      if (next) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('app-theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('app-theme', 'light');
-      }
-      return next;
-    });
+    setAppTheme(isDarkMode ? 'brand' : 'dark');
   };
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
@@ -298,6 +302,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerRefresh,
         isDarkMode,
         toggleDarkMode,
+        appTheme,
+        setAppTheme,
       }}
     >
       {children}
