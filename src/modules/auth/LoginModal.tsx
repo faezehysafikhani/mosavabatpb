@@ -54,7 +54,7 @@ export const LoginModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-in fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-5 text-center relative shrink-0">
+        <div className="app-modal-header text-white p-5 text-center relative shrink-0">
           <button
             onClick={() => setIsLoginModalOpen(false)}
             className="absolute top-4 left-4 text-teal-200 hover:text-white p-1 rounded-lg hover:bg-teal-800"

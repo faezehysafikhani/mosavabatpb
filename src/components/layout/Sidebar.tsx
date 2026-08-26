@@ -122,7 +122,7 @@ export const Sidebar: React.FC = () => {
           route: 'guide' as AppRoute,
           title: 'راهنمای کاربری سامانه',
           icon: BookOpen,
-          badge: 7,
+          badge: 8,
           badgeColor: 'bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-[9px] border border-teal-200 dark:border-teal-800',
         },
       ],

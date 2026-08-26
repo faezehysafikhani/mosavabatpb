@@ -61,6 +61,14 @@
   --app-surface: rgba(255, 255, 255, 0.7);
 }
 
+.dark {
+  --app-primary: #334155;
+  --app-primary-strong: #020617;
+  --app-accent: #38bdf8;
+  --app-page: #020617;
+  --app-surface: rgba(15, 23, 42, 0.97);
+}
+
 .app-shell,
 .app-main {
   background: var(--app-page) !important;
@@ -73,6 +81,20 @@
 .app-nav-active,
 .app-primary-button {
   background: linear-gradient(135deg, var(--app-primary), var(--app-primary-strong)) !important;
+}
+
+.app-modal-header {
+  background: linear-gradient(135deg, var(--app-primary), var(--app-primary-strong)) !important;
+}
+
+.app-modal-header .bg-teal-800,
+.app-modal-header .bg-teal-900 {
+  background: rgba(255, 255, 255, 0.13) !important;
+}
+
+.app-modal-header .text-teal-200,
+.app-modal-header .text-teal-300 {
+  color: rgba(255, 255, 255, 0.88) !important;
 }
 
 .app-primary-button:hover {

@@ -224,7 +224,7 @@ export const AiAssistantModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in select-none" dir="rtl">
       <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-4xl w-full h-[90vh] max-h-[820px] overflow-hidden flex flex-col">
-        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-950 text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0 shadow-xs">
+        <div className="app-modal-header text-white p-3.5 sm:p-4 flex items-center justify-between shrink-0 shadow-xs">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-400 to-emerald-300 flex items-center justify-center text-slate-950 font-black shadow-sm shrink-0"><Sparkles className="w-5 h-5" /></div>
             <div className="min-w-0">

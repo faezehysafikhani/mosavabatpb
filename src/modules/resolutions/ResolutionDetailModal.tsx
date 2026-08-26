@@ -174,7 +174,7 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-5 flex items-center justify-between">
+        <div className="app-modal-header text-white p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-2xl bg-teal-800 text-teal-200">
               <FileCheck2 className="w-6 h-6" />

@@ -127,7 +127,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ isOpen, onClos
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-900 via-teal-800 to-slate-900 text-white p-4 flex items-center justify-between">
+        <div className="app-modal-header text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-teal-800 text-teal-200">
               <UserPlus className="w-5 h-5" />

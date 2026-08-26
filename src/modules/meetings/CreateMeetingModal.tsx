@@ -193,7 +193,7 @@ export const CreateMeetingModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-teal-900 to-slate-900 text-white p-4 flex items-center justify-between shrink-0">
+        <div className="app-modal-header text-white p-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-teal-800 text-teal-300">
               <Calendar className="w-5 h-5" />

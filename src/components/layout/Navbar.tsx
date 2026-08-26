@@ -165,17 +165,17 @@ export const Navbar: React.FC = () => {
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1.5 min-w-[190px] lg:min-w-[250px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
             >
               <UserCheck className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
               <span className="hidden md:inline font-medium text-slate-500 dark:text-slate-400">کاربر:</span>
-              <span className="font-bold max-w-[120px] truncate">{currentUser.fullName}</span>
+              <span className="font-bold whitespace-nowrap">{currentUser.fullName}</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {/* Dropdown for role switching */}
             {showUserMenu && (
-              <div className="absolute left-0 mt-2 w-72 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in slide-in-from-top-2">
+              <div className="absolute left-0 mt-2 w-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-2 z-50 animate-in fade-in slide-in-from-top-2">
                 <div className="p-2 border-b border-slate-100 dark:border-slate-800 mb-1">
                   <p className="text-xs font-bold text-slate-800 dark:text-slate-200">تغییر کاربر فعال (شبیه‌سازی)</p>
                   <p className="text-[10px] text-slate-400 dark:text-slate-400">بررسی سطح دسترسی‌ها و کارتابل‌ها با هویت‌های مختلف</p>
