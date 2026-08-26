@@ -52,7 +52,7 @@ export const ResolutionListView: React.FC = () => {
         searchTerm,
         executionStatus: executionFilter,
         departmentId: departmentFilter,
-        relatedUserId: currentUser.id,
+        relatedUserId: currentUser.role === 'ADMIN' ? undefined : currentUser.id,
         pageSize: 50,
       });
       if (res.isSuccess) {

@@ -45,7 +45,7 @@ export const MeetingListView: React.FC = () => {
         searchTerm,
         status: statusFilter,
         departmentId: departmentFilter,
-        participantUserId: currentUser.id,
+        participantUserId: currentUser.role === 'ADMIN' ? undefined : currentUser.id,
         pageSize: 50,
       });
       if (res.isSuccess) {

@@ -56,10 +56,11 @@ export const DashboardView: React.FC = () => {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
+      const isAdmin = currentUser.role === 'ADMIN';
       const [kpiRes, meetingsRes, resRes, taskRes, apprRes] = await Promise.all([
-        reportService.getDashboardKPIs(currentUser.id),
-        meetingService.getMeetings({ pageSize: 5, participantUserId: currentUser.id }),
-        resolutionService.getResolutions({ pageSize: 6, relatedUserId: currentUser.id }),
+        reportService.getDashboardKPIs(isAdmin ? undefined : currentUser.id),
+        meetingService.getMeetings({ pageSize: 5, participantUserId: isAdmin ? undefined : currentUser.id }),
+        resolutionService.getResolutions({ pageSize: 6, relatedUserId: isAdmin ? undefined : currentUser.id }),
         taskService.getMyTasks(currentUser.id, { pageSize: 4, status: 'IN_PROGRESS' }),
         approvalService.getMyApprovals(currentUser.id, { pageSize: 4, status: 'PENDING' }),
       ]);
