@@ -11,7 +11,6 @@ import {
   Calendar, 
   FileText, 
   UserCheck, 
-  Sparkles,
   ChevronDown,
   User as UserIcon,
   ShieldAlert,
@@ -21,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
-import { PostBankEmblem } from '../common/PostBankLogo';
 
 export const Navbar: React.FC = () => {
   const { 
@@ -37,7 +35,6 @@ export const Navbar: React.FC = () => {
     markAllNotificationsAsRead,
     clearAllNotifications,
     navigateTo,
-    setIsAiAssistantOpen,
     setIsLoginModalOpen,
     showToast,
     isDarkMode,
@@ -47,6 +44,11 @@ export const Navbar: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationTab, setNotificationTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const todayJalali = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -99,20 +101,19 @@ export const Navbar: React.FC = () => {
             onClick={() => navigateTo('dashboard')}
             className="flex items-center gap-2.5 cursor-pointer select-none"
           >
-            <PostBankEmblem size={32} />
+            <img
+              src="/postbank.png"
+              alt="لوگوی پست بانک ایران"
+              className="w-12 h-12 object-contain rounded-lg bg-white shrink-0"
+            />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-black text-[#e30613] dark:text-[#ff5260]">پست بانک ایران</span>
-                <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
-                <h1 className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-100 tracking-tight hidden sm:inline">سامانه مصوبات و جلسات</h1>
+                <h1 className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-100 tracking-tight hidden sm:inline">سامانه مصوبات و جلسات</h1>
               </div>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium sm:hidden">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium sm:hidden">
                 سامانه مصوبات و جلسات
               </span>
             </div>
-            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium hidden md:inline border-r border-slate-200 dark:border-slate-800 pr-3 mr-1">
-              امروز: {toPersianDigits('۱۴۰۳/۰۸/۱۵')}
-            </span>
           </div>
         </div>
 
@@ -138,7 +139,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Left side: Role switcher, AI Assistant trigger, Notifications, Theme switch, User Profile */}
+        {/* Left side: Role switcher, current date, Notifications, Theme switch, User Profile */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           
           {/* Quick Role Switcher */}
@@ -187,15 +188,13 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Quick AI Assistant Trigger */}
-          <button
-            onClick={() => setIsAiAssistantOpen(true)}
-            className="flex items-center gap-1.5 bg-teal-50 dark:bg-teal-950/70 hover:bg-teal-100 dark:hover:bg-teal-900 text-teal-800 dark:text-teal-300 font-bold text-xs py-1.5 px-3 rounded-full border border-teal-200 dark:border-teal-800 transition-all cursor-pointer"
-            title="دستیار هوشمند مدیریت مصوبات و جلسات"
+          <div
+            className="hidden sm:flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700"
+            title="تاریخ امروز"
           >
-            <Sparkles className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
-            <span className="hidden sm:inline">دستیار هوشمند</span>
-          </button>
+            <Calendar className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+            <span>امروز: {todayJalali}</span>
+          </div>
 
           {/* Notifications Dropdown (Item 5 Fixed) */}
           <div className="relative" ref={notifRef}>

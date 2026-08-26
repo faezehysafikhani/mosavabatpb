@@ -5,3 +5,4 @@ export * from './taskService';
 export * from './approvalService';
 export * from './reportService';
 export * from './userService';
+export * from './chatService';
