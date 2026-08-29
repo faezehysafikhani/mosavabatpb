@@ -81,7 +81,7 @@ export const Sidebar: React.FC = () => {
       items: [
         {
           route: 'proposals' as AppRoute,
-          title: 'پیشنهادها',
+          title: 'درخواست‌های راهبردی',
           icon: Lightbulb,
         },
         {

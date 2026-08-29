@@ -81,8 +81,8 @@ class MockProposalService implements IProposalService {
   public async convertToAgendaItem(id: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
-    if (!proposal) throw new Error('پیشنهاد یافت نشد');
-    if (!proposal.assignedMeetingId) throw new Error('جلسه مقصد برای این پیشنهاد تعیین نشده است');
+    if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
+    if (!proposal.assignedMeetingId) throw new Error('جلسه مقصد برای این درخواست راهبردی تعیین نشده است');
 
     const meetingRes = await meetingService.getMeetingById(proposal.assignedMeetingId);
     const meeting = meetingRes.data;

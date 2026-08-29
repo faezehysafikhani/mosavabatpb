@@ -62,7 +62,7 @@ export const ProposalsView: React.FC = () => {
   const handleCreateProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
-      showToast('خطا', 'عنوان و شرح پیشنهاد الزامی است.', 'error');
+      showToast('خطا', 'عنوان و شرح درخواست راهبردی الزامی است.', 'error');
       return;
     }
     setIsSubmitting(true);
@@ -75,7 +75,7 @@ export const ProposalsView: React.FC = () => {
         proposerDepartmentName: proposerDept,
         dateJalali: '۱۴۰۳/۰۶/۲۸',
       });
-      showToast('ثبت پیشنهاد', 'پیشنهاد شما برای بررسی به کارتابل مدیریت ارسال شد.', 'success');
+      showToast('ثبت درخواست راهبردی', 'درخواست راهبردی شما برای بررسی به کارتابل مدیریت ارسال شد.', 'success');
       setTitle('');
       setDescription('');
       triggerRefresh();
@@ -90,7 +90,7 @@ export const ProposalsView: React.FC = () => {
 
   const handleAssignToMeeting = async () => {
     if (selectedIds.length === 0) {
-      showToast('خطا', 'حداقل یک پیشنهاد را انتخاب کنید.', 'error');
+      showToast('خطا', 'حداقل یک درخواست راهبردی را انتخاب کنید.', 'error');
       return;
     }
     if (!assignMeetingId) {
@@ -99,7 +99,7 @@ export const ProposalsView: React.FC = () => {
     }
     const meeting = meetings.find((m) => m.id === assignMeetingId);
     await proposalService.reviewProposals(selectedIds, 'ASSIGNED_TO_MEETING', meeting?.id, meeting?.title, decisionNotes);
-    showToast('بررسی پیشنهادها', `${toPersianDigits(selectedIds.length)} پیشنهاد به جلسه «${meeting?.title}» تخصیص یافت.`, 'success');
+    showToast('بررسی درخواست‌های راهبردی', `${toPersianDigits(selectedIds.length)} درخواست راهبردی به جلسه «${meeting?.title}» تخصیص یافت.`, 'success');
     setSelectedIds([]);
     setAssignMeetingId('');
     setDecisionNotes('');
@@ -108,11 +108,11 @@ export const ProposalsView: React.FC = () => {
 
   const handleReject = async () => {
     if (selectedIds.length === 0) {
-      showToast('خطا', 'حداقل یک پیشنهاد را انتخاب کنید.', 'error');
+      showToast('خطا', 'حداقل یک درخواست راهبردی را انتخاب کنید.', 'error');
       return;
     }
     await proposalService.reviewProposals(selectedIds, 'REJECTED', undefined, undefined, decisionNotes);
-    showToast('بررسی پیشنهادها', `${toPersianDigits(selectedIds.length)} پیشنهاد رد شد.`, 'warning');
+    showToast('بررسی درخواست‌های راهبردی', `${toPersianDigits(selectedIds.length)} درخواست راهبردی رد شد.`, 'warning');
     setSelectedIds([]);
     setDecisionNotes('');
     triggerRefresh();
@@ -121,7 +121,7 @@ export const ProposalsView: React.FC = () => {
   const handleConvertToAgenda = async (proposal: Proposal) => {
     try {
       await proposalService.convertToAgendaItem(proposal.id);
-      showToast('تأیید جلسه', `پیشنهاد «${proposal.title}» به دستور جلسه «${proposal.assignedMeetingTitle}» اضافه شد.`, 'success');
+      showToast('تأیید جلسه', `درخواست راهبردی «${proposal.title}» به دستور جلسه «${proposal.assignedMeetingTitle}» اضافه شد.`, 'success');
       triggerRefresh();
     } catch (err) {
       showToast('خطا', err instanceof Error ? err.message : 'خطا در تبدیل به تأیید جلسه', 'error');
@@ -133,7 +133,7 @@ export const ProposalsView: React.FC = () => {
   const officeQueue = proposals.filter((p) => p.status === 'ASSIGNED_TO_MEETING');
 
   const visibleTabs: { id: ProposalTab; label: string; count: number; icon: React.ElementType }[] = [
-    { id: 'MINE', label: 'ثبت و پیشنهادهای من', count: myProposals.length, icon: Lightbulb },
+    { id: 'MINE', label: 'ثبت و درخواست‌های راهبردی من', count: myProposals.length, icon: Lightbulb },
     ...(isManagement ? [{ id: 'MANAGEMENT' as ProposalTab, label: 'کارتابل مدیریت', count: managementQueue.length, icon: Inbox }] : []),
     ...(isOfficeManager ? [{ id: 'OFFICE' as ProposalTab, label: 'کارتابل مسئول دفتر', count: officeQueue.length, icon: ClipboardList }] : []),
   ];
@@ -143,10 +143,10 @@ export const ProposalsView: React.FC = () => {
       <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-100">
         <h1 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
           <Lightbulb className="w-5 h-5 text-amber-500" />
-          <span>پیشنهادهای جلسه</span>
+          <span>درخواست‌های راهبردی</span>
         </h1>
         <p className="text-xs text-slate-400 font-medium mt-0.5">
-          ثبت پیشنهاد موضوع برای طرح در جلسات، بررسی مدیریت و تخصیص به جلسه توسط مسئول دفتر
+          ثبت درخواست راهبردی برای طرح در جلسات، بررسی مدیریت و تخصیص به جلسه توسط مسئول دفتر
         </p>
 
         <div className="flex flex-wrap gap-2 mt-4">
@@ -175,11 +175,11 @@ export const ProposalsView: React.FC = () => {
           <form onSubmit={handleCreateProposal} className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 space-y-3.5">
             <h3 className="text-xs font-extrabold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
               <Plus className="w-4 h-4 text-teal-700" />
-              ثبت پیشنهاد جدید
+              ثبت درخواست راهبردی جدید
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">عنوان پیشنهاد *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">عنوان درخواست *</label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="مثال: برگزاری دوره آموزشی امنیت سایبری" />
               </div>
               <div>
@@ -191,14 +191,14 @@ export const ProposalsView: React.FC = () => {
                 <input type="text" value={proposerDept} onChange={(e) => setProposerDept(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">شرح پیشنهاد و توضیحات *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">شرح درخواست و توضیحات *</label>
                 <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="این موضوع چرا باید در جلسه مطرح و درباره آن تصمیم‌گیری شود؟" />
               </div>
             </div>
             <div className="flex justify-end">
               <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs cursor-pointer">
                 <Send className="w-3.5 h-3.5" />
-                <span>{isSubmitting ? 'در حال ارسال...' : 'ارسال پیشنهاد به کارتابل مدیریت'}</span>
+                <span>{isSubmitting ? 'در حال ارسال...' : 'ارسال درخواست به کارتابل مدیریت'}</span>
               </button>
             </div>
           </form>
@@ -206,7 +206,7 @@ export const ProposalsView: React.FC = () => {
           <div className="space-y-3">
             {myProposals.length === 0 ? (
               <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
-                هنوز پیشنهادی ثبت نکرده‌اید.
+                هنوز درخواست راهبردی ثبت نکرده‌اید.
               </div>
             ) : myProposals.map((p) => (
               <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2">
@@ -227,7 +227,7 @@ export const ProposalsView: React.FC = () => {
         <div className="space-y-4">
           {selectedIds.length > 0 && (
             <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 space-y-3">
-              <div className="text-xs font-bold text-teal-900">{toPersianDigits(selectedIds.length)} پیشنهاد انتخاب شده</div>
+              <div className="text-xs font-bold text-teal-900">{toPersianDigits(selectedIds.length)} درخواست راهبردی انتخاب شده</div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <select value={assignMeetingId} onChange={(e) => setAssignMeetingId(e.target.value)} className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
                   <option value="">انتخاب جلسه مقصد...</option>
@@ -242,7 +242,7 @@ export const ProposalsView: React.FC = () => {
                 </button>
                 <button onClick={handleReject} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
                   <XCircle className="w-3.5 h-3.5" />
-                  <span>رد پیشنهادها</span>
+                  <span>رد درخواست‌ها</span>
                 </button>
               </div>
             </div>
@@ -251,7 +251,7 @@ export const ProposalsView: React.FC = () => {
           <div className="space-y-3">
             {managementQueue.length === 0 ? (
               <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
-                پیشنهادی در انتظار بررسی نیست.
+                درخواست راهبردی در انتظار بررسی نیست.
               </div>
             ) : managementQueue.map((p) => (
               <div key={p.id} onClick={() => toggleSelect(p.id)} className={`bg-white rounded-2xl p-4 shadow-xs border transition-all cursor-pointer flex items-start gap-3 ${selectedIds.includes(p.id) ? 'border-teal-500 ring-1 ring-teal-200' : 'border-slate-100 hover:border-slate-200'}`}>
@@ -271,7 +271,7 @@ export const ProposalsView: React.FC = () => {
         <div className="space-y-3">
           {officeQueue.length === 0 ? (
             <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
-              پیشنهاد تأییدشده‌ای در انتظار اقدام نیست.
+              درخواست تأییدشده‌ای در انتظار اقدام نیست.
             </div>
           ) : officeQueue.map((p) => (
             <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2.5">
