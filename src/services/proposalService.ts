@@ -2,6 +2,7 @@ import { Proposal, ApiResponse, ApiFilterParams, PagedResult } from '../types';
 import { mockProposals } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { loadLocalValue, saveLocalValue } from './localStore';
+import { toPersianDigits } from '../utils/formatters';
 
 const STORAGE_KEY = 'proposals';
 
@@ -14,11 +15,16 @@ export interface CreateProposalDto {
   dateJalali: string;
 }
 
+const getCurrentTimeString = (): string => toPersianDigits(
+  new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+);
+
 export interface IProposalService {
   getProposals(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Proposal>>>;
   createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>>;
   reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>>;
   recoverProposal(id: string): Promise<ApiResponse<Proposal>>;
+  confirmForMeeting(id: string, presenterId: string, presenterName: string): Promise<ApiResponse<Proposal>>;
   markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>>;
 }
 
@@ -66,7 +72,7 @@ class MockProposalService implements IProposalService {
   public async reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
-    if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
+    if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
     proposal.status = decision;
     proposal.managementDecisionNotes = notes;
     this.saveData(proposals);
@@ -76,9 +82,23 @@ class MockProposalService implements IProposalService {
   public async recoverProposal(id: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
-    if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
-    if (proposal.status !== 'REJECTED') throw new Error('فقط درخواست‌های رد شده قابل بازیافت هستند');
+    if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
+    if (proposal.status !== 'REJECTED') throw new Error('فقط موارد رد شده قابل بازیافت هستند');
     proposal.status = 'PENDING_CEO_REVIEW';
+    this.saveData(proposals);
+    return apiClient.simulateNetwork(proposal, 120);
+  }
+
+  public async confirmForMeeting(id: string, presenterId: string, presenterName: string): Promise<ApiResponse<Proposal>> {
+    const proposals = this.getData();
+    const proposal = proposals.find((p) => p.id === id);
+    if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
+    if (proposal.status !== 'APPROVED') throw new Error('فقط موارد تایید شده توسط مدیرعامل قابل تبدیل به تایید جلسه هستند');
+    proposal.status = 'CONFIRMED_FOR_MEETING';
+    proposal.confirmedPresenterId = presenterId;
+    proposal.confirmedPresenterName = presenterName;
+    proposal.confirmedDateJalali = '۱۴۰۳/۰۶/۲۸';
+    proposal.confirmedTimeString = getCurrentTimeString();
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 120);
   }
@@ -86,7 +106,7 @@ class MockProposalService implements IProposalService {
   public async markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
-    if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
+    if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
     proposal.status = 'CONVERTED_TO_AGENDA';
     proposal.assignedMeetingId = meetingId;
     proposal.assignedMeetingTitle = meetingTitle;

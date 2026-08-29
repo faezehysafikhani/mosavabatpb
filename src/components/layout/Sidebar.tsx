@@ -78,11 +78,15 @@ export const Sidebar: React.FC = () => {
       id: 'meetings_resolutions',
       title: 'جلسات و مصوبات',
       items: [
-        {
-          route: 'proposals' as AppRoute,
-          title: 'درخواست‌های راهبردی',
-          icon: Lightbulb,
-        },
+        ...(currentUser.role === 'ADMIN' || currentUser.role === 'CEO' || currentUser.role === 'SECRETARY'
+          ? [
+              {
+                route: 'proposals' as AppRoute,
+                title: 'مصوبات پیشنهادی',
+                icon: Lightbulb,
+              },
+            ]
+          : []),
         {
           route: 'meetings' as AppRoute,
           title: 'مدیریت جلسات',
@@ -108,13 +112,17 @@ export const Sidebar: React.FC = () => {
       id: 'cartable',
       title: 'کارتابل و تکالیف',
       items: [
-        {
-          route: 'tasks' as AppRoute,
-          title: 'وظایف ارجاعی من',
-          icon: CheckSquare,
-          badge: counts.tasks,
-          badgeColor: 'bg-rose-500 text-white',
-        },
+        ...(currentUser.role !== 'CEO'
+          ? [
+              {
+                route: 'tasks' as AppRoute,
+                title: 'وظایف ارجاعی من',
+                icon: CheckSquare,
+                badge: counts.tasks,
+                badgeColor: 'bg-rose-500 text-white',
+              },
+            ]
+          : []),
         ...(hasPermission('VIEW_APPROVALS') || currentUser.role === 'ADMIN' || currentUser.role === 'DEPT_MANAGER' || currentUser.role === 'CEO'
           ? [
               {

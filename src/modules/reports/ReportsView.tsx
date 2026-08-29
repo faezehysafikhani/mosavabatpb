@@ -1,30 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  FileSpreadsheet, 
-  FileDown, 
-  Printer, 
-  TrendingUp, 
-  Building2, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle 
+import {
+  BarChart3,
+  FileDown,
+  Printer,
+  TrendingUp,
+  Building2,
+  X
 } from 'lucide-react';
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Legend, 
-  LineChart, 
-  Line, 
-  CartesianGrid 
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend
 } from 'recharts';
 import { reportService } from '../../services/reportService';
-import { DepartmentPerformance, DashboardKPIs } from '../../types';
-import { toPersianDigits } from '../../utils/formatters';
+import { resolutionService } from '../../services/resolutionService';
+import { mockDepartments } from '../../mock/data';
+import { DepartmentPerformance, DashboardKPIs, Resolution } from '../../types';
+import { toPersianDigits, getResolutionExecutionMeta } from '../../utils/formatters';
 import { useApp } from '../../context/AppContext';
 
 export const ReportsView: React.FC = () => {
@@ -33,6 +30,9 @@ export const ReportsView: React.FC = () => {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [monthlyTrends, setMonthlyTrends] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detailDept, setDetailDept] = useState<DepartmentPerformance | null>(null);
+  const [detailResolutions, setDetailResolutions] = useState<Resolution[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     loadReports();
@@ -59,6 +59,18 @@ export const ReportsView: React.FC = () => {
 
   const handleExport = () => {
     showToast('گزارش عملکرد', 'گزارش جامع آماری در قالب اکسل دانلود شد.', 'info');
+  };
+
+  const handleOpenDeptDetail = async (dept: DepartmentPerformance) => {
+    setDetailDept(dept);
+    setDetailLoading(true);
+    try {
+      const targetDept = mockDepartments.find((d) => d.name === dept.departmentName);
+      const res = await resolutionService.getResolutions({ departmentId: targetDept?.id, pageSize: 100 });
+      if (res.isSuccess) setDetailResolutions(res.data.items);
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   return (
@@ -141,7 +153,7 @@ export const ReportsView: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {departments.map((dept) => (
-                <tr key={dept.departmentName} className="hover:bg-slate-50/80 transition-colors">
+                <tr key={dept.departmentName} onClick={() => handleOpenDeptDetail(dept)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
                   <td className="py-3.5 px-3 font-bold text-slate-800">{dept.departmentName}</td>
                   <td className="py-3.5 px-3 text-center font-bold text-slate-700">{toPersianDigits(dept.totalAssigned)}</td>
                   <td className="py-3.5 px-3 text-center font-bold text-emerald-600">{toPersianDigits(dept.completed)}</td>
@@ -170,6 +182,49 @@ export const ReportsView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Department Detail Modal */}
+      {detailDept && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="app-modal-header text-white p-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-teal-800 text-teal-200">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">{detailDept.departmentName}</h3>
+                  <p className="text-[11px] text-teal-200">جزئیات مصوبات و وظایف این واحد سازمانی</p>
+                </div>
+              </div>
+              <button onClick={() => setDetailDept(null)} className="text-teal-200 hover:text-white p-1 rounded-lg hover:bg-teal-800">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto space-y-2.5 flex-1">
+              {detailLoading ? (
+                <div className="text-center py-8 text-xs text-slate-400">در حال بارگذاری...</div>
+              ) : detailResolutions.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">مصوبه‌ای برای این واحد ثبت نشده است.</div>
+              ) : detailResolutions.map((res) => {
+                const meta = getResolutionExecutionMeta(res.executionStatus);
+                return (
+                  <div key={res.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-800">{res.topicTitle}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${meta.bg}`}>{meta.label}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">
+                      مسئول: {res.mainResponsibleName || 'تعیین نشده'} — مهلت: {toPersianDigits(res.deadlineJalali || '—')}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

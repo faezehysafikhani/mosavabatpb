@@ -56,15 +56,17 @@ export const CreateMeetingModal: React.FC = () => {
     }
   }, [isCreateMeetingOpen, createMeetingInitialDate]);
 
-  // Approved strategic requests, ready to be picked as a ready-made agenda item
-  const [approvedProposals, setApprovedProposals] = useState<Proposal[]>([]);
+  // Proposed resolutions confirmed for a meeting ("تایید جلسه"), ready to be picked as a ready-made agenda item
+  const [confirmedProposals, setConfirmedProposals] = useState<Proposal[]>([]);
   const [consumedProposalIds, setConsumedProposalIds] = useState<string[]>([]);
   const [selectedProposalId, setSelectedProposalId] = useState('');
+  const [proposalStartTime, setProposalStartTime] = useState('09:00');
+  const [proposalEndTime, setProposalEndTime] = useState('09:30');
 
   useEffect(() => {
     if (isCreateMeetingOpen) {
-      proposalService.getProposals({ status: 'APPROVED', pageSize: 200 }).then((res) => {
-        if (res.isSuccess) setApprovedProposals(res.data.items);
+      proposalService.getProposals({ status: 'CONFIRMED_FOR_MEETING', pageSize: 200 }).then((res) => {
+        if (res.isSuccess) setConfirmedProposals(res.data.items);
       });
     }
   }, [isCreateMeetingOpen]);
@@ -132,26 +134,30 @@ export const CreateMeetingModal: React.FC = () => {
   };
 
   const handleAddFromProposal = () => {
-    const proposal = approvedProposals.find((p) => p.id === selectedProposalId);
+    const proposal = confirmedProposals.find((p) => p.id === selectedProposalId);
     if (!proposal) return;
+    const minutes = getMinutesDiff(proposalStartTime, proposalEndTime);
+    const presenterName = proposal.confirmedPresenterName || proposal.proposerName;
 
     const newAg: AgendaItem = {
       id: `ag-${Date.now()}`,
       order: agendas.length + 1,
       rowNumber: agendas.length + 1,
       title: proposal.title,
-      presenter: proposal.proposerName,
-      presenterName: proposal.proposerName,
+      presenter: presenterName,
+      presenterName: presenterName,
       description: proposal.description,
-      estimatedMinutes: 30,
-      allocatedMinutes: 30,
+      estimatedMinutes: minutes,
+      allocatedMinutes: minutes,
       isDiscussed: false,
       status: 'PENDING',
     };
     setAgendas([...agendas, newAg]);
-    setApprovedProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+    setConfirmedProposals((prev) => prev.filter((p) => p.id !== proposal.id));
     setConsumedProposalIds((prev) => [...prev, proposal.id]);
     setSelectedProposalId('');
+    setProposalStartTime('09:00');
+    setProposalEndTime('09:30');
   };
 
   const handleRemoveAgenda = (id: string) => {
@@ -452,33 +458,41 @@ export const CreateMeetingModal: React.FC = () => {
               دستور کار جلسه (Agendas)
             </h4>
 
-            {/* Add agenda item from an approved strategic request */}
-            {approvedProposals.length > 0 && (
+            {/* Add agenda item from a confirmed proposed resolution ("تایید جلسه") */}
+            {confirmedProposals.length > 0 && (
               <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-2xl space-y-2.5">
                 <div className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
                   <Lightbulb className="w-4 h-4 text-blue-700" />
-                  <span>افزودن از درخواست‌های راهبردی تأییدشده:</span>
+                  <span>افزودن از تایید جلسات (مصوبات پیشنهادی تأییدشده):</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedProposalId}
-                    onChange={(e) => setSelectedProposalId(e.target.value)}
-                    className="flex-1 text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
-                  >
-                    <option value="">انتخاب درخواست راهبردی تأییدشده...</option>
-                    {approvedProposals.map((p) => (
-                      <option key={p.id} value={p.id}>{p.title}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAddFromProposal}
-                    disabled={!selectedProposalId}
-                    className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>افزودن</span>
-                  </button>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                  <div className="sm:col-span-6">
+                    <select
+                      value={selectedProposalId}
+                      onChange={(e) => setSelectedProposalId(e.target.value)}
+                      className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                    >
+                      <option value="">انتخاب تایید جلسه...</option>
+                      {confirmedProposals.map((p) => (
+                        <option key={p.id} value={p.id}>{p.title} — {p.confirmedPresenterName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-4 grid grid-cols-2 gap-1.5">
+                    <PersianTimePicker label="از ساعت" value={proposalStartTime} onChange={setProposalStartTime} />
+                    <PersianTimePicker label="تا ساعت" value={proposalEndTime} onChange={setProposalEndTime} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button
+                      type="button"
+                      onClick={handleAddFromProposal}
+                      disabled={!selectedProposalId}
+                      className="w-full px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>افزودن</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

@@ -91,8 +91,8 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
   const currentStepIdx = resolution.verificationConfig?.currentStepIndex || 0;
   const currentStep = vSteps[currentStepIdx];
 
-  const isAssignee = currentUser.id === resolution.mainResponsibleUserId || currentUser.id === 'user-15' || currentUser.id === 'user-1';
-  const isCurrentApprover = currentStep && (currentUser.id === currentStep.approverId || currentUser.id === 'user-15' || currentUser.id === 'user-1');
+  const isAssignee = currentUser.id === resolution.mainResponsibleUserId || currentUser.role === 'ADMIN';
+  const isCurrentApprover = Boolean(currentStep) && (currentUser.id === currentStep.approverId || currentUser.role === 'ADMIN');
 
   const handleCompleteTask = async () => {
     if (!completionNotes) {

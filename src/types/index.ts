@@ -101,17 +101,21 @@ export interface Organization {
   phone?: string;
 }
 
-// Pre-meeting strategic-request workflow: the office manager (secretary)
-// registers a topic -> CEO approves or rejects it -> a rejected item can be
-// recovered back for reconsideration -> an approved item returns to the
-// office manager's cartable, where it becomes pickable as a ready-made
-// agenda item while creating a new meeting (see CreateMeetingModal), after
-// which the existing Meeting -> Resolution workflow takes over unchanged.
+// Pre-meeting proposed-resolution workflow: the office manager (secretary)
+// registers a topic -> CEO approves or rejects it -> a rejected item can
+// only be recovered (sent back for review) by the office manager -> an
+// approved item returns to the office manager's cartable, where they
+// confirm it as a "تایید جلسه" (meeting confirmation) and assign its
+// presenter -> confirmed items become pickable as a ready-made agenda item
+// while creating a new meeting (see CreateMeetingModal), where the office
+// manager also sets its time slot -> the existing Meeting -> Resolution
+// workflow takes over unchanged from there.
 export type ProposalStatus =
-  | 'PENDING_CEO_REVIEW'   // در انتظار بررسی مدیرعامل
-  | 'REJECTED'             // رد شده (قابل بازیافت)
-  | 'APPROVED'             // تایید شده توسط مدیرعامل، آماده افزودن به دستور یک جلسه
-  | 'CONVERTED_TO_AGENDA'; // تبدیل شده به بند دستور یک جلسه
+  | 'PENDING_CEO_REVIEW'     // در انتظار بررسی مدیرعامل
+  | 'REJECTED'               // رد شده (فقط قابل بازیافت)
+  | 'APPROVED'               // تایید شده توسط مدیرعامل، در انتظار تبدیل به تایید جلسه توسط مسئول دفتر
+  | 'CONFIRMED_FOR_MEETING'  // تایید جلسه شده (ارائه‌دهنده مشخص شد)، آماده افزودن به یک جلسه
+  | 'CONVERTED_TO_AGENDA';   // تبدیل شده به بند دستور یک جلسه مشخص
 
 export interface Proposal {
   id: string;
@@ -125,6 +129,10 @@ export interface Proposal {
   attachments: Attachment[];
   status: ProposalStatus;
   managementDecisionNotes?: string;
+  confirmedPresenterId?: string;
+  confirmedPresenterName?: string;
+  confirmedDateJalali?: string;
+  confirmedTimeString?: string;
   assignedMeetingId?: string;
   assignedMeetingTitle?: string;
   createdAt: string;

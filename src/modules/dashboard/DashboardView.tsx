@@ -299,22 +299,37 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
 
-          <div className="py-2 space-y-4">
-            {departmentData.map((dept) => (
-              <div key={dept.name} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-slate-700">{dept.name}</span>
-                  <span className="font-bold text-slate-900">{toPersianDigits(dept.count)}</span>
+          {chart2Mode === 'bar' ? (
+            <div className="py-2 space-y-4">
+              {departmentData.map((dept) => (
+                <div key={dept.name} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-slate-700">{dept.name}</span>
+                    <span className="font-bold text-slate-900">{toPersianDigits(dept.count)}</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${dept.percent}%`, backgroundColor: dept.color }}
+                    ></div>
+                  </div>
                 </div>
-                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${dept.percent}%`, backgroundColor: dept.color }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={departmentData} innerRadius={45} outerRadius={75} paddingAngle={3} dataKey="count">
+                    {departmentData.map((entry, index) => (
+                      <Cell key={`cell-dept-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           <div className="text-center pt-2 text-[10px] text-slate-400">
             {rankedDeptPerf.length > 0
@@ -349,18 +364,31 @@ export const DashboardView: React.FC = () => {
 
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={managerData}
-                  outerRadius={75}
-                  dataKey="value"
-                >
-                  {managerData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
-              </PieChart>
+              {chart3Mode === 'pie' ? (
+                <PieChart>
+                  <Pie
+                    data={managerData}
+                    outerRadius={75}
+                    dataKey="value"
+                  >
+                    {managerData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
+                </PieChart>
+              ) : (
+                <BarChart data={managerData} layout="vertical">
+                  <XAxis type="number" hide />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                    {managerData.map((entry, index) => (
+                      <Cell key={`cell-bar-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              )}
             </ResponsiveContainer>
           </div>
 

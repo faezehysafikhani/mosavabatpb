@@ -1600,6 +1600,23 @@ export const mockProposals: Proposal[] = [
     managementDecisionNotes: 'در حال حاضر بودجه لازم تخصیص داده نشده؛ سال آینده بررسی مجدد شود.',
     createdAt: new Date('2024-09-05').toISOString(),
   },
+  {
+    id: 'prop-4',
+    title: 'بازبینی دستورالعمل امنیت فیزیکی مراکز داده',
+    proposerName: 'مسئول دفتر',
+    proposerDepartmentId: 'dept-2',
+    proposerDepartmentName: 'معاونت برنامه‌ریزی و تحول سازمانی',
+    description: 'با توجه به تجهیزات جدید، دستورالعمل تردد و کنترل دسترسی مراکز داده باید بازبینی شود.',
+    dateJalali: '۱۴۰۳/۰۶/۱۲',
+    attachments: [],
+    status: 'CONFIRMED_FOR_MEETING',
+    managementDecisionNotes: 'تایید شد.',
+    confirmedPresenterId: 'user-7',
+    confirmedPresenterName: 'مهندس سعید تقوی',
+    confirmedDateJalali: '۱۴۰۳/۰۶/۲۸',
+    confirmedTimeString: '۱۰:۱۵',
+    createdAt: new Date('2024-09-02').toISOString(),
+  },
 ];
 
 export interface LoginHistoryEntry {

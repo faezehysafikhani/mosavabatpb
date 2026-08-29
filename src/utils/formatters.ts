@@ -110,7 +110,7 @@ export function getResolutionApprovalMeta(status: ResolutionApprovalStatus): { l
 export function getResolutionExecutionMeta(status: ResolutionExecutionStatus): { label: string; bg: string; text: string; dot: string } {
   switch (status) {
     case 'APPROVED_CLOSED':
-      return { label: 'خاتمه یافته و صحه‌گذاری شده', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' };
+      return { label: 'مختومه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' };
     case 'PENDING_APPROVAL':
       return { label: 'در انتظار صحه‌گذاری', bg: 'bg-yellow-50 text-yellow-700 border-yellow-200', text: 'text-yellow-700', dot: 'bg-yellow-500' };
     case 'IN_PROGRESS':
