@@ -32,7 +32,7 @@ export const MeetingListView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ListViewMode>('grid');
 
   useEffect(() => {
     fetchMeetings();

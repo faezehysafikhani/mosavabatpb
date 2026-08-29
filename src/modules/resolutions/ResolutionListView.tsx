@@ -35,7 +35,7 @@ export const ResolutionListView: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeModalResId, setActiveModalResId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ListViewMode>('grid');
 
   useEffect(() => {
     fetchResolutions();

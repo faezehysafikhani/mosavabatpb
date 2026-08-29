@@ -30,7 +30,7 @@ export const ApprovalsView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('PENDING');
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ListViewMode>('grid');
 
   // Approval/Rejection action state
   const [activeItem, setActiveItem] = useState<ApprovalCartableItem | null>(null);

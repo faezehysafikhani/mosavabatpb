@@ -29,7 +29,7 @@ export const MyTasksView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ListViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ListViewMode>('grid');
 
   // Complete task modal state
   const [activeCompletingTask, setActiveCompletingTask] = useState<Task | null>(null);
