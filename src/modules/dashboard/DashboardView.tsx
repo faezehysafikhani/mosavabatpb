@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FileDown, 
-  Filter, 
-  Calendar, 
+import {
+  Calendar,
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
@@ -31,17 +29,21 @@ import {
 } from 'recharts';
 import { useApp } from '../../context/AppContext';
 import { reportService, meetingService, resolutionService, taskService, approvalService } from '../../services';
-import { DashboardKPIs, Meeting, Resolution, Task, ApprovalCartableItem } from '../../types';
+import { DashboardKPIs, Meeting, Resolution, Task, ApprovalCartableItem, DepartmentPerformance } from '../../types';
 import { toPersianDigits, getResolutionExecutionMeta, getPriorityMeta } from '../../utils/formatters';
+import { mockDepartments } from '../../mock/data';
+
+const CHART_PALETTE = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#0ea5e9', '#ef4444'];
 
 export const DashboardView: React.FC = () => {
-  const { navigateTo, setIsCreateMeetingOpen, setIsAiAssistantOpen, showToast, currentUser, refreshTrigger } = useApp();
+  const { navigateTo, setIsCreateMeetingOpen, currentUser, refreshTrigger } = useApp();
 
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [recentMeetings, setRecentMeetings] = useState<Meeting[]>([]);
   const [recentResolutions, setRecentResolutions] = useState<Resolution[]>([]);
   const [urgentTasks, setUrgentTasks] = useState<Task[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalCartableItem[]>([]);
+  const [departmentPerf, setDepartmentPerf] = useState<DepartmentPerformance[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Chart view toggles (Pie vs Bar) matching screenshot
@@ -57,12 +59,13 @@ export const DashboardView: React.FC = () => {
     setLoading(true);
     try {
       const isAdmin = currentUser.role === 'ADMIN';
-      const [kpiRes, meetingsRes, resRes, taskRes, apprRes] = await Promise.all([
+      const [kpiRes, meetingsRes, resRes, taskRes, apprRes, deptPerfRes] = await Promise.all([
         reportService.getDashboardKPIs(isAdmin ? undefined : currentUser.id),
         meetingService.getMeetings({ pageSize: 5, participantUserId: isAdmin ? undefined : currentUser.id }),
         resolutionService.getResolutions({ pageSize: 6, relatedUserId: isAdmin ? undefined : currentUser.id }),
         taskService.getMyTasks(currentUser.id, { pageSize: 4, status: 'IN_PROGRESS' }),
         approvalService.getMyApprovals(currentUser.id, { pageSize: 4, status: 'PENDING' }),
+        reportService.getDepartmentPerformances(),
       ]);
 
       if (kpiRes.isSuccess) setKpis(kpiRes.data);
@@ -70,6 +73,7 @@ export const DashboardView: React.FC = () => {
       if (resRes.isSuccess) setRecentResolutions(resRes.data.items);
       if (taskRes.isSuccess) setUrgentTasks(taskRes.data.items);
       if (apprRes.isSuccess) setPendingApprovals(apprRes.data.items);
+      if (deptPerfRes.isSuccess) setDepartmentPerf(deptPerfRes.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -77,36 +81,35 @@ export const DashboardView: React.FC = () => {
     }
   };
 
-  const handlePrintPdf = () => {
-    showToast('خروجی PDF', 'در حال آماده‌سازی گزارش داشبورد جهت چاپ...', 'info');
-    setTimeout(() => {
-      window.print();
-    }, 400);
-  };
-
-  // Status chart data matching Capture.PNG
+  // Status chart data - all values derived live from reportService KPIs
   const statusData = [
     { name: 'در حال انجام', value: kpis?.inProgressResolutions ?? 0, color: '#2563eb' },
     { name: 'برنامه‌ریزی / شروع نشده', value: kpis ? Math.max(0, kpis.totalResolutions - kpis.inProgressResolutions - kpis.pendingApprovalResolutions - kpis.completedClosedResolutions - kpis.overdueResolutions) : 0, color: '#f59e0b' },
     { name: 'در انتظار صحه‌گذاری', value: kpis?.pendingApprovalResolutions ?? 0, color: '#a855f7' },
     { name: 'خاتمه یافته', value: kpis?.completedClosedResolutions ?? 0, color: '#10b981' },
   ];
+  const statusTotal = statusData.reduce((sum, s) => sum + s.value, 0);
 
-  // Department ownership data matching Capture.PNG horizontal bars
-  const departmentData = [
-    { name: 'واحد فناوری اطلاعات', count: 7, color: '#10b981', percent: 70 },
-    { name: 'معاونت برنامه‌ریزی', count: 5, color: '#3b82f6', percent: 50 },
-    { name: 'مدیریت منابع انسانی', count: 3, color: '#f59e0b', percent: 30 },
-    { name: 'اداره امور مالی', count: 2, color: '#a855f7', percent: 20 },
-  ];
+  // Department ownership data - derived from reportService.getDepartmentPerformances()
+  const rankedDeptPerf = [...departmentPerf].filter((d) => d.totalAssigned > 0).sort((a, b) => b.totalAssigned - a.totalAssigned).slice(0, 4);
+  const maxDeptAssigned = Math.max(1, ...rankedDeptPerf.map((d) => d.totalAssigned));
+  const departmentData = rankedDeptPerf.map((d, index) => ({
+    name: d.departmentName,
+    count: d.totalAssigned,
+    color: CHART_PALETTE[index % CHART_PALETTE.length],
+    percent: Math.round((d.totalAssigned / maxDeptAssigned) * 100),
+  }));
 
-  // Proposer / Manager distribution matching Capture.PNG
-  const managerData = [
-    { name: 'مهندس حسینی (IT)', value: 7, color: '#10b981' },
-    { name: 'دکتر احمدی (برنامه‌ریزی)', value: 6, color: '#3b82f6' },
-    { name: 'مهندس مرادی (HR)', value: 2, color: '#ec4899' },
-    { name: 'دکتر رستمی (ریاست)', value: 1, color: '#f59e0b' },
-  ];
+  // Department-manager distribution - joins the same performance data with mockDepartments for manager names
+  const managerData = rankedDeptPerf.map((d, index) => {
+    const dept = mockDepartments.find((dep) => dep.name === d.departmentName);
+    const shortCode = dept?.code?.split('-')[0] || dept?.name || '';
+    return {
+      name: `${dept?.managerName || d.departmentName} (${shortCode})`,
+      value: d.totalAssigned,
+      color: CHART_PALETTE[index % CHART_PALETTE.length],
+    };
+  });
 
   return (
     <div className="space-y-6 pb-12">
@@ -119,22 +122,6 @@ export const DashboardView: React.FC = () => {
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={handlePrintPdf}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
-          >
-            <FileDown className="w-3.5 h-3.5 text-slate-600" />
-            <span>خروجی PDF</span>
-          </button>
-
-          <button
-            onClick={() => showToast('فیلترها', 'فیلترهای پیشرفته فعال هستند.', 'info')}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-full border border-slate-200 transition-colors cursor-pointer"
-          >
-            <Filter className="w-3.5 h-3.5 text-slate-600" />
-            <span>فیلترها</span>
-          </button>
-
-          <button
             onClick={() => setIsCreateMeetingOpen(true)}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-full shadow-xs transition-colors cursor-pointer"
           >
@@ -144,89 +131,69 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Row 1: 4 Large Metric KPI Cards matching Clean Minimalism Theme */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Row 1: 4 Compact Metric KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Card 1: Total Meetings */}
-        <div 
+        <div
           onClick={() => navigateTo('meetings')}
-          className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
+          className="bg-white rounded-2xl px-4 py-3 shadow-xs border border-slate-100 flex items-center justify-between gap-2 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-500 font-medium">تعداد کل جلسات</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
               <Calendar className="w-4 h-4" />
             </div>
+            <span className="text-xs text-slate-500 font-medium truncate">تعداد کل جلسات</span>
           </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.totalMeetings ?? 0)}
-            </div>
-            <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-              فعال
-            </span>
+          <div className="text-xl font-black text-slate-800 tracking-tight shrink-0">
+            {toPersianDigits(kpis?.totalMeetings ?? 0)}
           </div>
         </div>
 
         {/* Card 2: Total Resolutions */}
-        <div 
+        <div
           onClick={() => navigateTo('resolutions')}
-          className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
+          className="bg-white rounded-2xl px-4 py-3 shadow-xs border border-slate-100 flex items-center justify-between gap-2 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-500 font-medium">تعداد کل مصوبات</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
               <Layers className="w-4 h-4" />
             </div>
+            <span className="text-xs text-slate-500 font-medium truncate">تعداد کل مصوبات</span>
           </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.totalResolutions ?? 0)}
-            </div>
-            <span className="text-[11px] font-medium text-slate-400">
-              ثبت‌شده
-            </span>
+          <div className="text-xl font-black text-slate-800 tracking-tight shrink-0">
+            {toPersianDigits(kpis?.totalResolutions ?? 0)}
           </div>
         </div>
 
         {/* Card 3: In Progress Resolutions */}
-        <div 
+        <div
           onClick={() => navigateTo('resolutions')}
-          className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
+          className="bg-white rounded-2xl px-4 py-3 shadow-xs border border-slate-100 flex items-center justify-between gap-2 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-500 font-medium">مصوبات در حال اجرا</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold shrink-0">
               <Clock className="w-4 h-4" />
             </div>
+            <span className="text-xs text-slate-500 font-medium truncate">مصوبات در حال اجرا</span>
           </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.inProgressResolutions ?? 0)}
-            </div>
-            <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-              در جریان
-            </span>
+          <div className="text-xl font-black text-slate-800 tracking-tight shrink-0">
+            {toPersianDigits(kpis?.inProgressResolutions ?? 0)}
           </div>
         </div>
 
         {/* Card 4: My Active Tasks */}
-        <div 
+        <div
           onClick={() => navigateTo('tasks')}
-          className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
+          className="bg-white rounded-2xl px-4 py-3 shadow-xs border border-slate-100 flex items-center justify-between gap-2 cursor-pointer hover:shadow-md hover:border-slate-200 transition-all group"
         >
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-slate-500 font-medium">اقدامات من</span>
-            <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold shrink-0">
               <CheckCircle2 className="w-4 h-4" />
             </div>
+            <span className="text-xs text-slate-500 font-medium truncate">اقدامات من</span>
           </div>
-          <div className="flex items-baseline justify-between">
-            <div className="text-2xl font-black text-slate-800 tracking-tight">
-              {toPersianDigits(kpis?.myPendingTasksCount ?? 0)}
-            </div>
-            <span className="text-[11px] font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-              اقدام فوری
-            </span>
+          <div className="text-xl font-black text-slate-800 tracking-tight shrink-0">
+            {toPersianDigits(kpis?.myPendingTasksCount ?? 0)}
           </div>
         </div>
       </div>
@@ -292,21 +259,19 @@ export const DashboardView: React.FC = () => {
             {/* Center label for donut */}
             {chart1Mode === 'donut' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-xl font-black text-slate-800">{toPersianDigits(16)}</span>
+                <span className="text-xl font-black text-slate-800">{toPersianDigits(statusTotal)}</span>
                 <span className="text-[10px] text-slate-400 font-medium">مجموع</span>
               </div>
             )}
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-[11px] text-slate-600 font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              <span>در حال انجام: {toPersianDigits(11)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span>برنامه‌ریزی: {toPersianDigits(5)}</span>
-            </div>
+            {statusData.map((s) => (
+              <div key={s.name} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }}></span>
+                <span>{s.name}: {toPersianDigits(s.value)}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -352,7 +317,9 @@ export const DashboardView: React.FC = () => {
           </div>
 
           <div className="text-center pt-2 text-[10px] text-slate-400">
-            بیشترین تمرکز مصوبات روی اداره کل فناوری اطلاعات است
+            {rankedDeptPerf.length > 0
+              ? `بیشترین تمرکز مصوبات روی ${rankedDeptPerf[0].departmentName} است`
+              : 'داده‌ای برای نمایش وجود ندارد'}
           </div>
         </div>
 

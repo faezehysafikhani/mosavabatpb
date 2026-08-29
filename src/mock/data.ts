@@ -1473,7 +1473,8 @@ export const mockNotifications: AppNotification[] = [
     timeString: '۰۹:۱۵',
     isRead: false,
     type: 'ASSIGNMENT',
-    targetRoute: '/tasks'
+    targetRoute: '/resolutions',
+    targetResolutionId: 'res-1'
   },
   {
     id: 'notif-2',
@@ -1483,7 +1484,8 @@ export const mockNotifications: AppNotification[] = [
     timeString: '۱۶:۴۶',
     isRead: false,
     type: 'APPROVAL_REQUEST',
-    targetRoute: '/approvals'
+    targetRoute: '/resolutions',
+    targetResolutionId: 'res-10'
   },
   {
     id: 'notif-3',
@@ -1493,7 +1495,8 @@ export const mockNotifications: AppNotification[] = [
     timeString: '۰۸:۰۰',
     isRead: true,
     type: 'DEADLINE',
-    targetRoute: '/tasks'
+    targetRoute: '/resolutions',
+    targetResolutionId: 'res-6'
   },
   {
     id: 'notif-4',
@@ -1503,6 +1506,7 @@ export const mockNotifications: AppNotification[] = [
     timeString: '۱۶:۰۵',
     isRead: true,
     type: 'APPROVED',
-    targetRoute: '/resolutions'
+    targetRoute: '/resolutions',
+    targetResolutionId: 'res-3'
   }
 ];

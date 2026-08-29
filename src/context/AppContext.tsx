@@ -153,11 +153,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
-  const markNotificationAsRead = async (id: string) => {
-    await userService.markNotificationAsRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) => {
+      const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+      saveLocalCollection('notifications', next);
+      return next;
+    });
   };
 
   const markAllNotificationsAsRead = () => {

@@ -43,7 +43,7 @@ interface GuideSlide {
   quickSummary: string;
 }
 
-const GUIDE_SLIDES: GuideSlide[] = [
+export const GUIDE_SLIDES: GuideSlide[] = [
   {
     id: 1,
     title: 'معرفی جامع سامانه و جریان کاری کلان',

@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
+import { meetingService, resolutionService, taskService } from '../../services';
+import { Meeting, Resolution, Task } from '../../types';
 
 export const Navbar: React.FC = () => {
   const { 
@@ -48,6 +50,8 @@ export const Navbar: React.FC = () => {
   const [notificationTab, setNotificationTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchResults, setSearchResults] = useState<{ meetings: Meeting[]; resolutions: Resolution[]; tasks: Task[] }>({ meetings: [], resolutions: [], tasks: [] });
   const [now, setNow] = useState(new Date());
   const todayJalali = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
     year: 'numeric',
@@ -63,6 +67,7 @@ export const Navbar: React.FC = () => {
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -81,10 +86,59 @@ export const Navbar: React.FC = () => {
       if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
         setShowThemeMenu(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Global search: query meetings/resolutions/tasks visible to the current user
+  useEffect(() => {
+    const term = globalSearch.trim();
+    if (term.length < 2) {
+      setSearchResults({ meetings: [], resolutions: [], tasks: [] });
+      setShowSearchResults(false);
+      return;
+    }
+    const isAdmin = currentUser.role === 'ADMIN';
+    const timer = window.setTimeout(() => {
+      Promise.all([
+        meetingService.getMeetings({ searchTerm: term, pageSize: 5, participantUserId: isAdmin ? undefined : currentUser.id }),
+        resolutionService.getResolutions({ searchTerm: term, pageSize: 5, relatedUserId: isAdmin ? undefined : currentUser.id }),
+        taskService.getMyTasks(currentUser.id, { searchTerm: term, pageSize: 5 }),
+      ]).then(([meetingsRes, resRes, taskRes]) => {
+        setSearchResults({
+          meetings: meetingsRes.isSuccess ? meetingsRes.data.items : [],
+          resolutions: resRes.isSuccess ? resRes.data.items : [],
+          tasks: taskRes.isSuccess ? taskRes.data.items : [],
+        });
+        setShowSearchResults(true);
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [globalSearch, currentUser.id]);
+
+  const totalSearchResults = searchResults.meetings.length + searchResults.resolutions.length + searchResults.tasks.length;
+
+  const handleSelectMeeting = (meeting: Meeting) => {
+    navigateTo('meeting-details', { meetingId: meeting.id });
+    setShowSearchResults(false);
+    setGlobalSearch('');
+  };
+
+  const handleSelectResolution = (resolution: Resolution) => {
+    navigateTo('resolutions', { resolutionId: resolution.id });
+    setShowSearchResults(false);
+    setGlobalSearch('');
+  };
+
+  const handleSelectTask = (task: Task) => {
+    navigateTo('tasks');
+    setShowSearchResults(false);
+    setGlobalSearch('');
+  };
 
   const filteredNotifications = notifications.filter((n) => {
     if (notificationTab === 'UNREAD') return !n.isRead;
@@ -94,8 +148,11 @@ export const Navbar: React.FC = () => {
   const handleNotificationClick = (notif: typeof notifications[0]) => {
     markNotificationAsRead(notif.id);
     setShowNotifications(false);
-    
-    if (notif.targetRoute) {
+
+    if (notif.targetResolutionId) {
+      navigateTo('resolutions', { resolutionId: notif.targetResolutionId });
+      showToast(notif.title, 'مصوبه مربوطه نمایش داده شد.', 'info');
+    } else if (notif.targetRoute) {
       const cleanRoute = notif.targetRoute.replace('/', '') as AppRoute;
       navigateTo(cleanRoute);
       showToast(notif.title, 'انتقال به بخش مربوطه انجام شد.', 'info');
@@ -138,22 +195,76 @@ export const Navbar: React.FC = () => {
 
         {/* Center: Global Search Bar */}
         <div className="hidden lg:flex flex-1 max-w-sm mx-4">
-          <div className="relative w-full">
+          <div className="relative w-full" ref={searchRef}>
             <input
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
+              onFocus={() => { if (totalSearchResults > 0) setShowSearchResults(true); }}
               placeholder="جستجوی شماره مصوبه، عنوان جلسه، نام مسئول..."
               className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-1.5 pr-8 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
             />
             <Search className="w-4 h-4 text-slate-400 absolute right-2.5 top-2" />
             {globalSearch && (
-              <button 
-                onClick={() => setGlobalSearch('')}
+              <button
+                onClick={() => { setGlobalSearch(''); setShowSearchResults(false); }}
                 className="absolute left-2 top-1.5 text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full hover:bg-slate-300 dark:hover:bg-slate-600"
               >
                 پاک کردن
               </button>
+            )}
+
+            {showSearchResults && (
+              <div className="absolute top-full mt-2 w-full bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 z-50 max-h-96 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                {totalSearchResults === 0 ? (
+                  <div className="text-center py-6 text-xs text-slate-400">نتیجه‌ای یافت نشد</div>
+                ) : (
+                  <div className="space-y-2">
+                    {searchResults.resolutions.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1 text-[10px] font-extrabold text-slate-400">مصوبات</div>
+                        {searchResults.resolutions.map((r) => (
+                          <button key={r.id} onClick={() => handleSelectResolution(r)} className="w-full text-right px-2.5 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-2">
+                            <FileText className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold truncate">{r.topicTitle}</div>
+                              <div className="text-[10px] text-slate-400">{r.resolutionNumber}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.meetings.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1 text-[10px] font-extrabold text-slate-400">جلسات</div>
+                        {searchResults.meetings.map((m) => (
+                          <button key={m.id} onClick={() => handleSelectMeeting(m)} className="w-full text-right px-2.5 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-2">
+                            <Calendar className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold truncate">{m.title}</div>
+                              <div className="text-[10px] text-slate-400">{m.meetingNumber}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.tasks.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1 text-[10px] font-extrabold text-slate-400">وظایف</div>
+                        {searchResults.tasks.map((t) => (
+                          <button key={t.id} onClick={() => handleSelectTask(t)} className="w-full text-right px-2.5 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold truncate">{t.resolutionTitle}</div>
+                              <div className="text-[10px] text-slate-400">{t.resolutionNumber}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -354,15 +465,6 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Logout / Switch User */}
-          <button
-            onClick={() => setIsLoginModalOpen(true)}
-            className="p-2 text-slate-400 hover:text-rose-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="خروج / تغییر کاربر"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-
           <div
             className="hidden xl:flex items-center gap-2 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[11px] py-1.5 px-3 rounded-full border border-slate-200 dark:border-slate-700 whitespace-nowrap"
             title="تاریخ و ساعت جاری"
@@ -373,6 +475,15 @@ export const Navbar: React.FC = () => {
             <Clock3 className="w-3.5 h-3.5 text-[var(--app-primary)]" />
             <span dir="ltr">{currentTime}</span>
           </div>
+
+          {/* Logout / Switch User */}
+          <button
+            onClick={() => setIsLoginModalOpen(true)}
+            className="p-2 text-slate-400 hover:text-rose-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            title="خروج / تغییر کاربر"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </header>

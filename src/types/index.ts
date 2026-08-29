@@ -332,6 +332,7 @@ export interface AppNotification {
   isRead: boolean;
   type: 'ASSIGNMENT' | 'DEADLINE' | 'APPROVAL_REQUEST' | 'APPROVED' | 'REJECTED' | 'MEETING';
   targetRoute?: string;
+  targetResolutionId?: string;
 }
 
 export interface DashboardKPIs {

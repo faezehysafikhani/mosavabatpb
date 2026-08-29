@@ -1,13 +1,13 @@
-import React from 'react';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  FileCheck2, 
-  CheckSquare, 
-  Users, 
-  BookOpen, 
-  ChevronLeft, 
-  ChevronRight, 
+import React, { useEffect, useState } from 'react';
+import {
+  LayoutDashboard,
+  Calendar,
+  FileCheck2,
+  CheckSquare,
+  Users,
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
   ShieldCheck,
   FileSpreadsheet,
   Clock,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
+import { meetingService, resolutionService, taskService, approvalService } from '../../services';
+import { GUIDE_SLIDES } from '../../modules/guide/UserGuideView';
 
 interface NavGroup {
   id: string;
@@ -30,14 +32,34 @@ interface NavGroup {
 }
 
 export const Sidebar: React.FC = () => {
-  const { 
-    currentRoute, 
-    navigateTo, 
-    isSidebarCollapsed, 
-    toggleSidebar, 
+  const {
+    currentRoute,
+    navigateTo,
+    isSidebarCollapsed,
+    toggleSidebar,
     currentUser,
-    hasPermission
+    hasPermission,
+    refreshTrigger
   } = useApp();
+
+  const [counts, setCounts] = useState({ meetings: 0, resolutions: 0, tasks: 0, approvals: 0 });
+
+  useEffect(() => {
+    const isAdmin = currentUser.role === 'ADMIN';
+    Promise.all([
+      meetingService.getMeetings({ pageSize: 1, participantUserId: isAdmin ? undefined : currentUser.id }),
+      resolutionService.getResolutions({ pageSize: 1, relatedUserId: isAdmin ? undefined : currentUser.id }),
+      taskService.getMyTasks(currentUser.id, { pageSize: 1 }),
+      approvalService.getMyApprovals(currentUser.id, { pageSize: 1, status: 'PENDING' }),
+    ]).then(([meetingsRes, resRes, taskRes, apprRes]) => {
+      setCounts({
+        meetings: meetingsRes.isSuccess ? meetingsRes.data.totalCount : 0,
+        resolutions: resRes.isSuccess ? resRes.data.totalCount : 0,
+        tasks: taskRes.isSuccess ? taskRes.data.totalCount : 0,
+        approvals: apprRes.isSuccess ? apprRes.data.totalCount : 0,
+      });
+    });
+  }, [currentUser.id, refreshTrigger]);
 
   const allNavGroups: NavGroup[] = [
     {
@@ -59,14 +81,14 @@ export const Sidebar: React.FC = () => {
           route: 'meetings' as AppRoute,
           title: 'مدیریت جلسات',
           icon: Calendar,
-          badge: 15,
+          badge: counts.meetings,
           badgeColor: 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800',
         },
         {
           route: 'resolutions' as AppRoute,
           title: 'بانک مصوبات',
           icon: FileCheck2,
-          badge: 12,
+          badge: counts.resolutions,
           badgeColor: 'bg-teal-700 text-white',
         },
         {
@@ -84,7 +106,7 @@ export const Sidebar: React.FC = () => {
           route: 'tasks' as AppRoute,
           title: 'وظایف ارجاعی من',
           icon: CheckSquare,
-          badge: 4,
+          badge: counts.tasks,
           badgeColor: 'bg-rose-500 text-white',
         },
         ...(hasPermission('VIEW_APPROVALS') || currentUser.role === 'ADMIN' || currentUser.role === 'DEPT_MANAGER' || currentUser.role === 'CEO'
@@ -93,7 +115,7 @@ export const Sidebar: React.FC = () => {
                 route: 'approvals' as AppRoute,
                 title: 'کارتابل صحه‌گذاری',
                 icon: ShieldCheck,
-                badge: 12,
+                badge: counts.approvals,
                 badgeColor: 'bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800',
               },
             ]
@@ -122,7 +144,7 @@ export const Sidebar: React.FC = () => {
           route: 'guide' as AppRoute,
           title: 'راهنمای کاربری سامانه',
           icon: BookOpen,
-          badge: 8,
+          badge: GUIDE_SLIDES.length,
           badgeColor: 'bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-[9px] border border-teal-200 dark:border-teal-800',
         },
       ],
