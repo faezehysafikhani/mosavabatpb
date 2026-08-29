@@ -6,3 +6,4 @@ export * from './approvalService';
 export * from './reportService';
 export * from './userService';
 export * from './chatService';
+export * from './proposalService';

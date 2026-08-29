@@ -4,8 +4,9 @@ import { mockUsers, mockNotifications } from '../mock/data';
 import { userService } from '../services/userService';
 import { loadLocalCollection, loadLocalValue, saveLocalCollection, saveLocalValue } from '../services/localStore';
 
-export type AppRoute = 
+export type AppRoute =
   | 'dashboard'
+  | 'proposals'
   | 'meetings'
   | 'meeting-details'
   | 'resolutions'

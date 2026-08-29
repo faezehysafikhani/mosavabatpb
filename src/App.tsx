@@ -10,6 +10,7 @@ import { CreateResolutionModal } from './modules/resolutions/CreateResolutionMod
 
 // Views
 import { DashboardView } from './modules/dashboard/DashboardView';
+import { ProposalsView } from './modules/proposals/ProposalsView';
 import { MeetingListView } from './modules/meetings/MeetingListView';
 import { MeetingDetailView } from './modules/meetings/MeetingDetailView';
 import { ResolutionListView } from './modules/resolutions/ResolutionListView';
@@ -37,6 +38,8 @@ const AppContent: React.FC = () => {
     switch (currentRoute) {
       case 'dashboard':
         return <DashboardView />;
+      case 'proposals':
+        return <ProposalsView />;
       case 'meetings':
         return <MeetingListView />;
       case 'meeting-details':

@@ -101,7 +101,34 @@ export interface Organization {
   phone?: string;
 }
 
-export type MeetingStatus = 
+// Pre-meeting proposal workflow: a unit/person proposes a topic for a future
+// meeting; management reviews and assigns it to a meeting; the office
+// manager (secretary) then turns it into an agenda item on that meeting,
+// after which the existing Meeting -> Resolution workflow takes over.
+export type ProposalStatus =
+  | 'PENDING_MANAGEMENT_REVIEW'  // در انتظار بررسی مدیریت
+  | 'REJECTED'                   // رد شده
+  | 'ASSIGNED_TO_MEETING'        // تأیید و تخصیص داده‌شده به جلسه (در انتظار اقدام مسئول دفتر)
+  | 'CONVERTED_TO_AGENDA';       // تبدیل شده به تأیید جلسه (بند دستور جلسه)
+
+export interface Proposal {
+  id: string;
+  title: string;
+  proposerName: string;
+  proposerDepartmentId: string;
+  proposerDepartmentName: string;
+  description: string;
+  notes?: string;
+  dateJalali: string;
+  attachments: Attachment[];
+  status: ProposalStatus;
+  managementDecisionNotes?: string;
+  assignedMeetingId?: string;
+  assignedMeetingTitle?: string;
+  createdAt: string;
+}
+
+export type MeetingStatus =
   | 'DRAFT'           // پیش‌نویس
   | 'SCHEDULED'       // برنامه‌ریزی شده
   | 'IN_PROGRESS'     // در حال برگزاری

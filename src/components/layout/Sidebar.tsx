@@ -12,7 +12,8 @@ import {
   FileSpreadsheet,
   Clock,
   UserCheck,
-  Settings
+  Settings,
+  Lightbulb
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
@@ -78,6 +79,11 @@ export const Sidebar: React.FC = () => {
       id: 'meetings_resolutions',
       title: 'جلسات و مصوبات',
       items: [
+        {
+          route: 'proposals' as AppRoute,
+          title: 'پیشنهادها',
+          icon: Lightbulb,
+        },
         {
           route: 'meetings' as AppRoute,
           title: 'مدیریت جلسات',

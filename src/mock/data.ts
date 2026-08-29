@@ -1,13 +1,14 @@
-import { 
-  User, 
-  Department, 
-  Organization, 
-  Meeting, 
-  Resolution, 
-  Task, 
-  ApprovalCartableItem, 
-  ActivityLog, 
-  AppNotification 
+import {
+  User,
+  Department,
+  Organization,
+  Meeting,
+  Resolution,
+  Task,
+  ApprovalCartableItem,
+  ActivityLog,
+  AppNotification,
+  Proposal
 } from '../types';
 
 export const mockOrganizations: Organization[] = [
@@ -1509,6 +1510,49 @@ export const mockNotifications: AppNotification[] = [
     targetRoute: '/resolutions',
     targetResolutionId: 'res-3'
   }
+];
+
+export const mockProposals: Proposal[] = [
+  {
+    id: 'prop-1',
+    title: 'برگزاری کارگاه آموزشی امنیت سایبری برای کارکنان',
+    proposerName: 'مهندس مهدی کمالی',
+    proposerDepartmentId: 'dept-6',
+    proposerDepartmentName: 'مرکز امنیت اطلاعات و حراست',
+    description: 'با توجه به افزایش حملات فیشینگ، پیشنهاد می‌شود کارگاه آموزشی برای کلیه کارکنان برگزار شود.',
+    dateJalali: '۱۴۰۳/۰۶/۲۰',
+    attachments: [],
+    status: 'PENDING_MANAGEMENT_REVIEW',
+    createdAt: new Date('2024-09-10').toISOString(),
+  },
+  {
+    id: 'prop-2',
+    title: 'بازنگری فرآیند جذب و استخدام کارشناسان فنی',
+    proposerName: 'خانم الهام فراهانی',
+    proposerDepartmentId: 'dept-3',
+    proposerDepartmentName: 'مدیریت منابع انسانی و آموزش',
+    description: 'به دلیل طولانی بودن چرخه جذب، پیشنهاد بازطراحی فرآیند مصاحبه و ارزیابی مطرح می‌شود.',
+    dateJalali: '۱۴۰۳/۰۶/۱۸',
+    attachments: [],
+    status: 'ASSIGNED_TO_MEETING',
+    assignedMeetingId: 'meet-3',
+    assignedMeetingTitle: 'نشست بازنگری آیین‌نامه رفاهی و ارزیابی عملکرد کارکنان',
+    managementDecisionNotes: 'موضوع در دستور جلسه منابع انسانی بررسی شود.',
+    createdAt: new Date('2024-09-08').toISOString(),
+  },
+  {
+    id: 'prop-3',
+    title: 'خرید مجوز نرم‌افزار مانیتورینگ زیرساخت شبکه',
+    proposerName: 'مهندس سارا نیک‌نام',
+    proposerDepartmentId: 'dept-1',
+    proposerDepartmentName: 'اداره کل فناوری اطلاعات و ارتباطات',
+    description: 'برای پایش لحظه‌ای سلامت سرورها و شبکه، تهیه ابزار مانیتورینگ تخصصی پیشنهاد می‌شود.',
+    dateJalali: '۱۴۰۳/۰۶/۱۵',
+    attachments: [],
+    status: 'REJECTED',
+    managementDecisionNotes: 'در حال حاضر بودجه لازم تخصیص داده نشده؛ سال آینده بررسی مجدد شود.',
+    createdAt: new Date('2024-09-05').toISOString(),
+  },
 ];
 
 export interface LoginHistoryEntry {
