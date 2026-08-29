@@ -19,6 +19,7 @@ import { ReportsView } from './modules/reports/ReportsView';
 import { CalendarView } from './modules/calendar/CalendarView';
 import { UsersView } from './modules/users/UsersView';
 import { UserGuideView } from './modules/guide/UserGuideView';
+import { SettingsView } from './modules/settings/SettingsView';
 
 import { Sparkles, Bot } from 'lucide-react';
 
@@ -53,8 +54,9 @@ const AppContent: React.FC = () => {
       case 'users':
         return <UsersView />;
       case 'guide':
-      case 'settings':
         return <UserGuideView />;
+      case 'settings':
+        return <SettingsView />;
       default:
         return <DashboardView />;
     }

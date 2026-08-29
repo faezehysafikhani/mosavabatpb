@@ -172,7 +172,7 @@ export const AiAssistantModal: React.FC = () => {
     setInputText('');
     setIsTyping(true);
     try {
-      const result = await chatService.execute(query, currentUser.id);
+      const result = await chatService.execute(query, currentUser.role === 'ADMIN' ? undefined : currentUser.id);
       const botMessage: ChatMessage = {
         id: `bot-${Date.now()}`,
         sender: 'bot',

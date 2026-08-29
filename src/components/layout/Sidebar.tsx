@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   FileSpreadsheet,
   Clock,
-  UserCheck
+  UserCheck,
+  Settings
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
@@ -138,6 +139,11 @@ export const Sidebar: React.FC = () => {
                 title: 'مدیریت کاربران',
                 icon: Users,
               },
+              {
+                route: 'settings' as AppRoute,
+                title: 'تنظیمات',
+                icon: Settings,
+              },
             ]
           : []),
         {
@@ -221,7 +227,7 @@ export const Sidebar: React.FC = () => {
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const ItemIcon = item.icon;
-                const isActive = (currentRoute === item.route || (item.route === 'guide' && currentRoute === 'settings')) && !item.action;
+                const isActive = currentRoute === item.route && !item.action;
 
                 return (
                   <button

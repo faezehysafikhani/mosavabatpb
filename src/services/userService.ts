@@ -8,6 +8,7 @@ export interface IUserService {
   getUserById(id: string): Promise<ApiResponse<User | null>>;
   createUser(dto: Omit<User, 'id'>): Promise<ApiResponse<User>>;
   updateUser(id: string, dto: Omit<User, 'id'>): Promise<ApiResponse<User>>;
+  deleteUser(id: string): Promise<ApiResponse<boolean>>;
   getDepartments(): Promise<ApiResponse<Department[]>>;
   getOrganizations(): Promise<ApiResponse<Organization[]>>;
   getNotifications(userId?: string): Promise<ApiResponse<AppNotification[]>>;
@@ -45,6 +46,13 @@ class MockUserService implements IUserService {
     this.users[index] = { id, ...dto };
     saveLocalCollection('users', this.users);
     return apiClient.simulateNetwork(this.users[index], 100);
+  }
+
+  public async deleteUser(id: string): Promise<ApiResponse<boolean>> {
+    const initialLen = this.users.length;
+    this.users = this.users.filter((user) => user.id !== id);
+    saveLocalCollection('users', this.users);
+    return apiClient.simulateNetwork(this.users.length < initialLen, 100);
   }
 
   public async getDepartments(): Promise<ApiResponse<Department[]>> {

@@ -39,6 +39,7 @@ interface AppContextType {
   availableUsers: User[];
   addUser: (userData: Omit<User, 'id'>) => Promise<User>;
   updateUser: (id: string, userData: Omit<User, 'id'>) => Promise<User>;
+  deleteUser: (id: string) => Promise<void>;
   currentRoute: AppRoute;
   navigateTo: (route: AppRoute, params?: { meetingId?: string; resolutionId?: string; taskId?: string }) => void;
   selectedMeetingId: string | null;
@@ -258,6 +259,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return updatedUser;
   };
 
+  const deleteUser = async (id: string): Promise<void> => {
+    const target = availableUsers.find((user) => user.id === id);
+    await userService.deleteUser(id);
+    setAvailableUsers((prev) => prev.filter((user) => user.id !== id));
+    showToast('حذف کاربر', `کاربر «${target?.fullName || ''}» حذف شد.`, 'info');
+    triggerRefresh();
+  };
+
   const openCreateResolutionModal = (opts?: {
     meetingId?: string;
     agendaItemId?: string;
@@ -283,6 +292,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         availableUsers,
         addUser,
         updateUser,
+        deleteUser,
         currentRoute,
         navigateTo,
         selectedMeetingId,

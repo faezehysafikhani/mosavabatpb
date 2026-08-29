@@ -418,7 +418,7 @@ class ChatService {
 
     try {
       const [resolutions, meetings, tasks, approvals] = await Promise.all([
-        loadAllPages<Resolution>((pageIndex, pageSize) => resolutionService.getResolutions({ pageIndex, pageSize })),
+        loadAllPages<Resolution>((pageIndex, pageSize) => resolutionService.getResolutions({ pageIndex, pageSize, relatedUserId: currentUserId })),
         loadAllPages<Meeting>((pageIndex, pageSize) => meetingService.getMeetings({ pageIndex, pageSize })),
         loadAllPages<Task>((pageIndex, pageSize) => taskService.getMyTasks(intent.mineOnly ? currentUserId : undefined, { pageIndex, pageSize })),
         loadAllPages<ApprovalCartableItem>((pageIndex, pageSize) => approvalService.getMyApprovals(intent.mineOnly ? currentUserId : undefined, { pageIndex, pageSize })),

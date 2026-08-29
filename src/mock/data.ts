@@ -1510,3 +1510,27 @@ export const mockNotifications: AppNotification[] = [
     targetResolutionId: 'res-3'
   }
 ];
+
+export interface LoginHistoryEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  dateJalali: string;
+  timeString: string;
+  ip: string;
+  device: string;
+  status: 'SUCCESS' | 'FAILED';
+}
+
+export const mockLoginHistory: LoginHistoryEntry[] = [
+  { id: 'lh-1', userId: 'user-admin', userName: 'مدیر کل سیستم (Admin)', dateJalali: '۱۴۰۳/۰۶/۲۸', timeString: '۰۸:۱۲', ip: '192.168.1.10', device: 'Windows / Chrome', status: 'SUCCESS' },
+  { id: 'lh-2', userId: 'user-1', userName: 'دکتر علیرضا رستمی', dateJalali: '۱۴۰۳/۰۶/۲۸', timeString: '۰۸:۴۵', ip: '192.168.1.22', device: 'macOS / Safari', status: 'SUCCESS' },
+  { id: 'lh-3', userId: 'user-2', userName: 'مهندس پوریا حسینی', dateJalali: '۱۴۰۳/۰۶/۲۸', timeString: '۰۹:۰۳', ip: '192.168.1.31', device: 'Windows / Edge', status: 'SUCCESS' },
+  { id: 'lh-4', userId: 'user-6', userName: 'دکتر حمید کاظمی', dateJalali: '۱۴۰۳/۰۶/۲۷', timeString: '۱۷:۲۰', ip: '192.168.1.44', device: 'Android / Chrome', status: 'FAILED' },
+  { id: 'lh-5', userId: 'user-6', userName: 'دکتر حمید کاظمی', dateJalali: '۱۴۰۳/۰۶/۲۷', timeString: '۱۷:۲۱', ip: '192.168.1.44', device: 'Android / Chrome', status: 'SUCCESS' },
+  { id: 'lh-6', userId: 'user-10', userName: 'مهندس آرش کریمی', dateJalali: '۱۴۰۳/۰۶/۲۶', timeString: '۱۰:۱۵', ip: '192.168.1.52', device: 'Windows / Firefox', status: 'SUCCESS' },
+  { id: 'lh-7', userId: 'user-3', userName: 'دکتر مسعود احمدی', dateJalali: '۱۴۰۳/۰۶/۲۶', timeString: '۱۱:۰۰', ip: '192.168.1.19', device: 'iOS / Safari', status: 'SUCCESS' },
+  { id: 'lh-8', userId: 'user-4', userName: 'سرکار خانم مهندس مریم مرادی', dateJalali: '۱۴۰۳/۰۶/۲۵', timeString: '۱۳:۴۰', ip: '192.168.1.63', device: 'Windows / Chrome', status: 'SUCCESS' },
+  { id: 'lh-9', userId: 'user-7', userName: 'مهندس سعید تقوی', dateJalali: '۱۴۰۳/۰۶/۲۴', timeString: '۰۹:۵۰', ip: '192.168.1.71', device: 'Linux / Chrome', status: 'FAILED' },
+  { id: 'lh-10', userId: 'user-5', userName: 'آقای بهزاد شریفی', dateJalali: '۱۴۰۳/۰۶/۲۴', timeString: '۱۴:۱۰', ip: '192.168.1.88', device: 'Windows / Edge', status: 'SUCCESS' },
+];
