@@ -1,8 +1,7 @@
-import { Proposal, ApiResponse, ApiFilterParams, PagedResult, AgendaItem } from '../types';
+import { Proposal, ApiResponse, ApiFilterParams, PagedResult } from '../types';
 import { mockProposals } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { loadLocalValue, saveLocalValue } from './localStore';
-import { meetingService } from './meetingService';
 
 const STORAGE_KEY = 'proposals';
 
@@ -18,8 +17,9 @@ export interface CreateProposalDto {
 export interface IProposalService {
   getProposals(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Proposal>>>;
   createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>>;
-  reviewProposals(ids: string[], decision: 'ASSIGNED_TO_MEETING' | 'REJECTED', meetingId?: string, meetingTitle?: string, notes?: string): Promise<ApiResponse<boolean>>;
-  convertToAgendaItem(id: string): Promise<ApiResponse<Proposal>>;
+  reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>>;
+  recoverProposal(id: string): Promise<ApiResponse<Proposal>>;
+  markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>>;
 }
 
 class MockProposalService implements IProposalService {
@@ -55,7 +55,7 @@ class MockProposalService implements IProposalService {
       id: `prop-${Date.now()}`,
       ...dto,
       attachments: [],
-      status: 'PENDING_MANAGEMENT_REVIEW',
+      status: 'PENDING_CEO_REVIEW',
       createdAt: new Date().toISOString(),
     };
     proposals.unshift(newProposal);
@@ -63,48 +63,35 @@ class MockProposalService implements IProposalService {
     return apiClient.simulateNetwork(newProposal, 150);
   }
 
-  public async reviewProposals(ids: string[], decision: 'ASSIGNED_TO_MEETING' | 'REJECTED', meetingId?: string, meetingTitle?: string, notes?: string): Promise<ApiResponse<boolean>> {
-    const proposals = this.getData();
-    proposals.forEach((p) => {
-      if (!ids.includes(p.id)) return;
-      p.status = decision;
-      p.managementDecisionNotes = notes || p.managementDecisionNotes;
-      if (decision === 'ASSIGNED_TO_MEETING') {
-        p.assignedMeetingId = meetingId;
-        p.assignedMeetingTitle = meetingTitle;
-      }
-    });
-    this.saveData(proposals);
-    return apiClient.simulateNetwork(true, 150);
-  }
-
-  public async convertToAgendaItem(id: string): Promise<ApiResponse<Proposal>> {
+  public async reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
-    if (!proposal.assignedMeetingId) throw new Error('جلسه مقصد برای این درخواست راهبردی تعیین نشده است');
-
-    const meetingRes = await meetingService.getMeetingById(proposal.assignedMeetingId);
-    const meeting = meetingRes.data;
-    if (!meeting) throw new Error('جلسه مقصد یافت نشد');
-
-    const newAgendaItem: AgendaItem = {
-      id: `ag-${Date.now()}`,
-      order: meeting.agendaItems.length + 1,
-      rowNumber: meeting.agendaItems.length + 1,
-      title: proposal.title,
-      presenter: proposal.proposerName,
-      presenterName: proposal.proposerName,
-      description: proposal.description,
-      isDiscussed: false,
-      status: 'PENDING',
-    };
-
-    await meetingService.updateMeeting(meeting.id, { agendaItems: [...meeting.agendaItems, newAgendaItem] });
-
-    proposal.status = 'CONVERTED_TO_AGENDA';
+    proposal.status = decision;
+    proposal.managementDecisionNotes = notes;
     this.saveData(proposals);
-    return apiClient.simulateNetwork(proposal, 150);
+    return apiClient.simulateNetwork(proposal, 120);
+  }
+
+  public async recoverProposal(id: string): Promise<ApiResponse<Proposal>> {
+    const proposals = this.getData();
+    const proposal = proposals.find((p) => p.id === id);
+    if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
+    if (proposal.status !== 'REJECTED') throw new Error('فقط درخواست‌های رد شده قابل بازیافت هستند');
+    proposal.status = 'PENDING_CEO_REVIEW';
+    this.saveData(proposals);
+    return apiClient.simulateNetwork(proposal, 120);
+  }
+
+  public async markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>> {
+    const proposals = this.getData();
+    const proposal = proposals.find((p) => p.id === id);
+    if (!proposal) throw new Error('درخواست راهبردی یافت نشد');
+    proposal.status = 'CONVERTED_TO_AGENDA';
+    proposal.assignedMeetingId = meetingId;
+    proposal.assignedMeetingTitle = meetingTitle;
+    this.saveData(proposals);
+    return apiClient.simulateNetwork(proposal, 100);
   }
 }
 

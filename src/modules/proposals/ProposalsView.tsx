@@ -1,62 +1,46 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lightbulb, Plus, Send, CheckSquare, Square, Calendar,
-  CheckCircle2, XCircle, Inbox, FileCheck2, ClipboardList
+  Lightbulb, Plus, Send, Calendar, CheckCircle2, XCircle, Inbox, RotateCcw
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { proposalService } from '../../services/proposalService';
-import { meetingService } from '../../services/meetingService';
-import { Proposal, ProposalStatus, Meeting } from '../../types';
+import { Proposal, ProposalStatus } from '../../types';
 import { toPersianDigits } from '../../utils/formatters';
 
-type ProposalTab = 'MINE' | 'MANAGEMENT' | 'OFFICE';
+type ProposalTab = 'OFFICE' | 'CEO';
 
 const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
-  PENDING_MANAGEMENT_REVIEW: { label: 'در انتظار بررسی مدیریت', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
+  PENDING_CEO_REVIEW: { label: 'در انتظار بررسی مدیرعامل', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
   REJECTED: { label: 'رد شده', bg: 'bg-rose-50 text-rose-700 border-rose-200' },
-  ASSIGNED_TO_MEETING: { label: 'در انتظار اقدام مسئول دفتر', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
-  CONVERTED_TO_AGENDA: { label: 'تبدیل شده به تأیید جلسه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  APPROVED: { label: 'تأیید شده - آماده افزودن به جلسه', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
+  CONVERTED_TO_AGENDA: { label: 'تبدیل شده به بند دستور جلسه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 };
+
+const DEFAULT_STATUS_META = { label: 'نامشخص', bg: 'bg-slate-50 text-slate-600 border-slate-200' };
+const getStatusMeta = (status: ProposalStatus) => STATUS_META[status] || DEFAULT_STATUS_META;
 
 export const ProposalsView: React.FC = () => {
   const { currentUser, showToast, refreshTrigger, triggerRefresh } = useApp();
 
-  const isManagement = currentUser.role === 'ADMIN' || currentUser.role === 'CEO' || currentUser.role === 'DEPT_MANAGER';
   const isOfficeManager = currentUser.role === 'ADMIN' || currentUser.role === 'SECRETARY';
+  const isCeo = currentUser.role === 'ADMIN' || currentUser.role === 'CEO';
 
-  const [tab, setTab] = useState<ProposalTab>('MINE');
+  const [tab, setTab] = useState<ProposalTab>(isOfficeManager ? 'OFFICE' : 'CEO');
   const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Create form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [proposerName, setProposerName] = useState(currentUser.fullName);
-  const [proposerDept, setProposerDept] = useState(currentUser.departmentName);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Management review state
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [assignMeetingId, setAssignMeetingId] = useState('');
-  const [decisionNotes, setDecisionNotes] = useState('');
+  const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchAll();
   }, [refreshTrigger]);
 
   const fetchAll = async () => {
-    setLoading(true);
-    try {
-      const [propRes, meetRes] = await Promise.all([
-        proposalService.getProposals({ pageSize: 200 }),
-        meetingService.getMeetings({ pageSize: 200 }),
-      ]);
-      if (propRes.isSuccess) setProposals(propRes.data.items);
-      if (meetRes.isSuccess) setMeetings(meetRes.data.items);
-    } finally {
-      setLoading(false);
-    }
+    const res = await proposalService.getProposals({ pageSize: 200 });
+    if (res.isSuccess) setProposals(res.data.items);
   };
 
   const handleCreateProposal = async (e: React.FormEvent) => {
@@ -70,12 +54,12 @@ export const ProposalsView: React.FC = () => {
       await proposalService.createProposal({
         title: title.trim(),
         description: description.trim(),
-        proposerName,
+        proposerName: currentUser.fullName,
         proposerDepartmentId: currentUser.departmentId,
-        proposerDepartmentName: proposerDept,
+        proposerDepartmentName: currentUser.departmentName,
         dateJalali: '۱۴۰۳/۰۶/۲۸',
       });
-      showToast('ثبت درخواست راهبردی', 'درخواست راهبردی شما برای بررسی به کارتابل مدیریت ارسال شد.', 'success');
+      showToast('ثبت درخواست راهبردی', 'درخواست راهبردی برای بررسی به کارتابل مدیرعامل ارسال شد.', 'success');
       setTitle('');
       setDescription('');
       triggerRefresh();
@@ -84,58 +68,31 @@ export const ProposalsView: React.FC = () => {
     }
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
-  };
-
-  const handleAssignToMeeting = async () => {
-    if (selectedIds.length === 0) {
-      showToast('خطا', 'حداقل یک درخواست راهبردی را انتخاب کنید.', 'error');
-      return;
-    }
-    if (!assignMeetingId) {
-      showToast('خطا', 'انتخاب جلسه مقصد الزامی است.', 'error');
-      return;
-    }
-    const meeting = meetings.find((m) => m.id === assignMeetingId);
-    await proposalService.reviewProposals(selectedIds, 'ASSIGNED_TO_MEETING', meeting?.id, meeting?.title, decisionNotes);
-    showToast('بررسی درخواست‌های راهبردی', `${toPersianDigits(selectedIds.length)} درخواست راهبردی به جلسه «${meeting?.title}» تخصیص یافت.`, 'success');
-    setSelectedIds([]);
-    setAssignMeetingId('');
-    setDecisionNotes('');
+  const handleReview = async (proposal: Proposal, decision: 'APPROVED' | 'REJECTED') => {
+    await proposalService.reviewProposal(proposal.id, decision, decisionNotes[proposal.id]);
+    showToast(
+      decision === 'APPROVED' ? 'تایید درخواست' : 'رد درخواست',
+      decision === 'APPROVED'
+        ? `درخواست «${proposal.title}» تایید شد و به کارتابل مسئول دفتر بازگشت.`
+        : `درخواست «${proposal.title}» رد شد.`,
+      decision === 'APPROVED' ? 'success' : 'warning'
+    );
+    setDecisionNotes((prev) => ({ ...prev, [proposal.id]: '' }));
     triggerRefresh();
   };
 
-  const handleReject = async () => {
-    if (selectedIds.length === 0) {
-      showToast('خطا', 'حداقل یک درخواست راهبردی را انتخاب کنید.', 'error');
-      return;
-    }
-    await proposalService.reviewProposals(selectedIds, 'REJECTED', undefined, undefined, decisionNotes);
-    showToast('بررسی درخواست‌های راهبردی', `${toPersianDigits(selectedIds.length)} درخواست راهبردی رد شد.`, 'warning');
-    setSelectedIds([]);
-    setDecisionNotes('');
+  const handleRecover = async (proposal: Proposal) => {
+    await proposalService.recoverProposal(proposal.id);
+    showToast('بازیافت درخواست', `درخواست «${proposal.title}» دوباره برای بررسی مدیرعامل ارسال شد.`, 'info');
     triggerRefresh();
   };
 
-  const handleConvertToAgenda = async (proposal: Proposal) => {
-    try {
-      await proposalService.convertToAgendaItem(proposal.id);
-      showToast('تأیید جلسه', `درخواست راهبردی «${proposal.title}» به دستور جلسه «${proposal.assignedMeetingTitle}» اضافه شد.`, 'success');
-      triggerRefresh();
-    } catch (err) {
-      showToast('خطا', err instanceof Error ? err.message : 'خطا در تبدیل به تأیید جلسه', 'error');
-    }
-  };
-
-  const myProposals = proposals.filter((p) => p.proposerName === currentUser.fullName);
-  const managementQueue = proposals.filter((p) => p.status === 'PENDING_MANAGEMENT_REVIEW');
-  const officeQueue = proposals.filter((p) => p.status === 'ASSIGNED_TO_MEETING');
+  const officeProposals = proposals.filter((p) => p.proposerName === currentUser.fullName || isOfficeManager);
+  const ceoQueue = proposals.filter((p) => p.status === 'PENDING_CEO_REVIEW');
 
   const visibleTabs: { id: ProposalTab; label: string; count: number; icon: React.ElementType }[] = [
-    { id: 'MINE', label: 'ثبت و درخواست‌های راهبردی من', count: myProposals.length, icon: Lightbulb },
-    ...(isManagement ? [{ id: 'MANAGEMENT' as ProposalTab, label: 'کارتابل مدیریت', count: managementQueue.length, icon: Inbox }] : []),
-    ...(isOfficeManager ? [{ id: 'OFFICE' as ProposalTab, label: 'کارتابل مسئول دفتر', count: officeQueue.length, icon: ClipboardList }] : []),
+    ...(isOfficeManager ? [{ id: 'OFFICE' as ProposalTab, label: 'ثبت و پیگیری درخواست‌ها', count: officeProposals.length, icon: Lightbulb }] : []),
+    ...(isCeo ? [{ id: 'CEO' as ProposalTab, label: 'کارتابل مدیرعامل', count: ceoQueue.length, icon: Inbox }] : []),
   ];
 
   return (
@@ -146,148 +103,114 @@ export const ProposalsView: React.FC = () => {
           <span>درخواست‌های راهبردی</span>
         </h1>
         <p className="text-xs text-slate-400 font-medium mt-0.5">
-          ثبت درخواست راهبردی برای طرح در جلسات، بررسی مدیریت و تخصیص به جلسه توسط مسئول دفتر
+          ثبت درخواست راهبردی توسط مسئول دفتر، بررسی و تصمیم مدیرعامل، و افزودن موارد تأییدشده به دستور جلسات
         </p>
 
-        <div className="flex flex-wrap gap-2 mt-4">
-          {visibleTabs.map(({ id, label, count, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
-                tab === id ? 'bg-teal-800 text-white border-teal-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{label}</span>
-              {count > 0 && (
-                <span className={`text-[9px] font-bold px-1.5 rounded-full ${tab === id ? 'bg-white/20' : 'bg-slate-100'}`}>
-                  {toPersianDigits(count)}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        {visibleTabs.length > 1 && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {visibleTabs.map(({ id, label, count, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                  tab === id ? 'bg-teal-800 text-white border-teal-800' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{label}</span>
+                {count > 0 && (
+                  <span className={`text-[9px] font-bold px-1.5 rounded-full ${tab === id ? 'bg-white/20' : 'bg-slate-100'}`}>
+                    {toPersianDigits(count)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {tab === 'MINE' && (
+      {tab === 'OFFICE' && isOfficeManager && (
         <div className="space-y-4">
           <form onSubmit={handleCreateProposal} className="bg-white rounded-2xl p-5 shadow-xs border border-slate-100 space-y-3.5">
             <h3 className="text-xs font-extrabold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
               <Plus className="w-4 h-4 text-teal-700" />
               ثبت درخواست راهبردی جدید
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">عنوان درخواست *</label>
-                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="مثال: برگزاری دوره آموزشی امنیت سایبری" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">پیشنهاددهنده</label>
-                <input type="text" value={proposerName} onChange={(e) => setProposerName(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">سازمان / واحد</label>
-                <input type="text" value={proposerDept} onChange={(e) => setProposerDept(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">شرح درخواست و توضیحات *</label>
-                <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="این موضوع چرا باید در جلسه مطرح و درباره آن تصمیم‌گیری شود؟" />
-              </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">عنوان *</label>
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="مثال: برگزاری دوره آموزشی امنیت سایبری" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">توضیحات *</label>
+              <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="این موضوع چرا باید در جلسه مطرح و درباره آن تصمیم‌گیری شود؟" />
             </div>
             <div className="flex justify-end">
               <button type="submit" disabled={isSubmitting} className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs cursor-pointer">
                 <Send className="w-3.5 h-3.5" />
-                <span>{isSubmitting ? 'در حال ارسال...' : 'ارسال درخواست به کارتابل مدیریت'}</span>
+                <span>{isSubmitting ? 'در حال ارسال...' : 'ارسال به کارتابل مدیرعامل'}</span>
               </button>
             </div>
           </form>
 
           <div className="space-y-3">
-            {myProposals.length === 0 ? (
+            {officeProposals.length === 0 ? (
               <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
-                هنوز درخواست راهبردی ثبت نکرده‌اید.
+                هنوز درخواست راهبردی ثبت نشده است.
               </div>
-            ) : myProposals.map((p) => (
+            ) : officeProposals.map((p) => (
               <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
-                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${STATUS_META[p.status].bg}`}>{STATUS_META[p.status].label}</span>
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${getStatusMeta(p.status).bg}`}>{getStatusMeta(p.status).label}</span>
                 </div>
                 <p className="text-xs text-slate-600">{p.description}</p>
-                {p.assignedMeetingTitle && <p className="text-[11px] text-blue-700">جلسه مقصد: {p.assignedMeetingTitle}</p>}
-                {p.managementDecisionNotes && <p className="text-[11px] text-slate-500">یادداشت مدیریت: {p.managementDecisionNotes}</p>}
+                {p.assignedMeetingTitle && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>افزوده شده به جلسه: {p.assignedMeetingTitle}</span>
+                  </div>
+                )}
+                {p.managementDecisionNotes && <p className="text-[11px] text-slate-500">یادداشت مدیرعامل: {p.managementDecisionNotes}</p>}
+                {p.status === 'REJECTED' && (
+                  <div className="flex justify-end pt-1">
+                    <button onClick={() => handleRecover(p)} className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold py-1.5 px-3 rounded-xl cursor-pointer">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>بازیافت و ارسال مجدد</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {tab === 'MANAGEMENT' && isManagement && (
-        <div className="space-y-4">
-          {selectedIds.length > 0 && (
-            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 space-y-3">
-              <div className="text-xs font-bold text-teal-900">{toPersianDigits(selectedIds.length)} درخواست راهبردی انتخاب شده</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <select value={assignMeetingId} onChange={(e) => setAssignMeetingId(e.target.value)} className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
-                  <option value="">انتخاب جلسه مقصد...</option>
-                  {meetings.map((m) => <option key={m.id} value={m.id}>{m.meetingNumber} - {m.title}</option>)}
-                </select>
-                <input type="text" value={decisionNotes} onChange={(e) => setDecisionNotes(e.target.value)} placeholder="یادداشت مدیریت (اختیاری)" className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={handleAssignToMeeting} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>تایید و انتخاب جلسه</span>
-                </button>
-                <button onClick={handleReject} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
-                  <XCircle className="w-3.5 h-3.5" />
-                  <span>رد درخواست‌ها</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {managementQueue.length === 0 ? (
-              <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
-                درخواست راهبردی در انتظار بررسی نیست.
-              </div>
-            ) : managementQueue.map((p) => (
-              <div key={p.id} onClick={() => toggleSelect(p.id)} className={`bg-white rounded-2xl p-4 shadow-xs border transition-all cursor-pointer flex items-start gap-3 ${selectedIds.includes(p.id) ? 'border-teal-500 ring-1 ring-teal-200' : 'border-slate-100 hover:border-slate-200'}`}>
-                {selectedIds.includes(p.id) ? <CheckSquare className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" /> : <Square className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />}
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">پیشنهاددهنده: {p.proposerName} — {p.proposerDepartmentName}</p>
-                  <p className="text-xs text-slate-600 mt-1">{p.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {tab === 'OFFICE' && isOfficeManager && (
+      {tab === 'CEO' && isCeo && (
         <div className="space-y-3">
-          {officeQueue.length === 0 ? (
+          {ceoQueue.length === 0 ? (
             <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
-              درخواست تأییدشده‌ای در انتظار اقدام نیست.
+              درخواست راهبردی در انتظار بررسی نیست.
             </div>
-          ) : officeQueue.map((p) => (
+          ) : ceoQueue.map((p) => (
             <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
-                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${STATUS_META[p.status].bg}`}>{STATUS_META[p.status].label}</span>
-              </div>
+              <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
               <p className="text-xs text-slate-600">{p.description}</p>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>جلسه مقصد: <strong className="text-slate-700">{p.assignedMeetingTitle}</strong></span>
-              </div>
-              <div className="flex justify-end pt-1">
-                <button onClick={() => handleConvertToAgenda(p)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
-                  <FileCheck2 className="w-3.5 h-3.5" />
-                  <span>تبدیل به تأیید جلسه</span>
+              <p className="text-[11px] text-slate-500">پیشنهاددهنده: {p.proposerName}</p>
+              <input
+                type="text"
+                value={decisionNotes[p.id] || ''}
+                onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                placeholder="یادداشت تصمیم (اختیاری)"
+                className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
+              />
+              <div className="flex items-center gap-2 pt-1">
+                <button onClick={() => handleReview(p, 'APPROVED')} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>تایید</span>
+                </button>
+                <button onClick={() => handleReview(p, 'REJECTED')} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>رد</span>
                 </button>
               </div>
             </div>

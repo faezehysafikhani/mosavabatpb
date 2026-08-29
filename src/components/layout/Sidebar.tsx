@@ -4,7 +4,6 @@ import {
   Calendar,
   FileCheck2,
   CheckSquare,
-  Users,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -140,11 +139,6 @@ export const Sidebar: React.FC = () => {
         },
         ...(currentUser.role === 'ADMIN' || hasPermission('MANAGE_USERS')
           ? [
-              {
-                route: 'users' as AppRoute,
-                title: 'مدیریت کاربران',
-                icon: Users,
-              },
               {
                 route: 'settings' as AppRoute,
                 title: 'تنظیمات',

@@ -1,11 +1,22 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { meetingService } from '../../services/meetingService';
+import { proposalService } from '../../services/proposalService';
 import { mockDepartments } from '../../mock/data';
 import { PersianDatePicker } from '../../components/common/PersianDatePicker';
 import { PersianTimePicker } from '../../components/common/PersianTimePicker';
-import { X, Plus, Trash2, Calendar, Clock, MapPin, Users, FileText, CheckCircle2, Search, UserCheck } from 'lucide-react';
-import { MeetingType, MeetingMember, AgendaItem } from '../../types';
+import { X, Plus, Trash2, Calendar, Clock, MapPin, Users, FileText, CheckCircle2, Search, UserCheck, Lightbulb } from 'lucide-react';
+import { MeetingType, MeetingMember, AgendaItem, Proposal } from '../../types';
+
+const toEnglishDigits = (value: string): string =>
+  value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+
+const getMinutesDiff = (start: string, end: string): number => {
+  const [sh, sm] = toEnglishDigits(start).split(':').map(Number);
+  const [eh, em] = toEnglishDigits(end).split(':').map(Number);
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  return diff > 0 ? diff : 30;
+};
 
 export const CreateMeetingModal: React.FC = () => {
   const { 
@@ -41,15 +52,30 @@ export const CreateMeetingModal: React.FC = () => {
       setAgendas([]);
       setNewAgendaTitle('');
       setNewAgendaPresenterId('');
+      setConsumedProposalIds([]);
     }
   }, [isCreateMeetingOpen, createMeetingInitialDate]);
+
+  // Approved strategic requests, ready to be picked as a ready-made agenda item
+  const [approvedProposals, setApprovedProposals] = useState<Proposal[]>([]);
+  const [consumedProposalIds, setConsumedProposalIds] = useState<string[]>([]);
+  const [selectedProposalId, setSelectedProposalId] = useState('');
+
+  useEffect(() => {
+    if (isCreateMeetingOpen) {
+      proposalService.getProposals({ status: 'APPROVED', pageSize: 200 }).then((res) => {
+        if (res.isSuccess) setApprovedProposals(res.data.items);
+      });
+    }
+  }, [isCreateMeetingOpen]);
 
   // Agenda items
   const [agendas, setAgendas] = useState<AgendaItem[]>([]);
 
   const [newAgendaTitle, setNewAgendaTitle] = useState('');
   const [newAgendaPresenterId, setNewAgendaPresenterId] = useState('');
-  const [newAgendaMinutes, setNewAgendaMinutes] = useState(30);
+  const [newAgendaStartTime, setNewAgendaStartTime] = useState('09:00');
+  const [newAgendaEndTime, setNewAgendaEndTime] = useState('09:30');
 
   // Selected members
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
@@ -84,6 +110,7 @@ export const CreateMeetingModal: React.FC = () => {
 
     const selectedPresenter = availableUsers.find((u) => u.id === newAgendaPresenterId);
     const presenterName = selectedPresenter ? selectedPresenter.fullName : 'دبیر جلسه';
+    const minutes = getMinutesDiff(newAgendaStartTime, newAgendaEndTime);
 
     const newAg: AgendaItem = {
       id: `ag-${Date.now()}`,
@@ -92,15 +119,39 @@ export const CreateMeetingModal: React.FC = () => {
       title: newAgendaTitle.trim(),
       presenter: presenterName,
       presenterName: presenterName,
-      estimatedMinutes: Number(newAgendaMinutes) || 30,
-      allocatedMinutes: Number(newAgendaMinutes) || 30,
+      estimatedMinutes: minutes,
+      allocatedMinutes: minutes,
       isDiscussed: false,
       status: 'PENDING',
     };
     setAgendas([...agendas, newAg]);
     setNewAgendaTitle('');
     setNewAgendaPresenterId('');
-    setNewAgendaMinutes(30);
+    setNewAgendaStartTime('09:00');
+    setNewAgendaEndTime('09:30');
+  };
+
+  const handleAddFromProposal = () => {
+    const proposal = approvedProposals.find((p) => p.id === selectedProposalId);
+    if (!proposal) return;
+
+    const newAg: AgendaItem = {
+      id: `ag-${Date.now()}`,
+      order: agendas.length + 1,
+      rowNumber: agendas.length + 1,
+      title: proposal.title,
+      presenter: proposal.proposerName,
+      presenterName: proposal.proposerName,
+      description: proposal.description,
+      estimatedMinutes: 30,
+      allocatedMinutes: 30,
+      isDiscussed: false,
+      status: 'PENDING',
+    };
+    setAgendas([...agendas, newAg]);
+    setApprovedProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+    setConsumedProposalIds((prev) => [...prev, proposal.id]);
+    setSelectedProposalId('');
   };
 
   const handleRemoveAgenda = (id: string) => {
@@ -162,6 +213,9 @@ export const CreateMeetingModal: React.FC = () => {
       });
 
       if (res.isSuccess) {
+        await Promise.all(
+          consumedProposalIds.map((proposalId) => proposalService.markConvertedToAgenda(proposalId, res.data.id, res.data.title))
+        );
         showToast('ثبت موفق', `جلسه "${res.data.title}" با شماره ${res.data.meetingNumber} ایجاد گردید.`, 'success');
         triggerRefresh();
         setIsCreateMeetingOpen(false);
@@ -398,6 +452,37 @@ export const CreateMeetingModal: React.FC = () => {
               دستور کار جلسه (Agendas)
             </h4>
 
+            {/* Add agenda item from an approved strategic request */}
+            {approvedProposals.length > 0 && (
+              <div className="p-3.5 bg-blue-50/60 border border-blue-200/80 rounded-2xl space-y-2.5">
+                <div className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                  <Lightbulb className="w-4 h-4 text-blue-700" />
+                  <span>افزودن از درخواست‌های راهبردی تأییدشده:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedProposalId}
+                    onChange={(e) => setSelectedProposalId(e.target.value)}
+                    className="flex-1 text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
+                  >
+                    <option value="">انتخاب درخواست راهبردی تأییدشده...</option>
+                    {approvedProposals.map((p) => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAddFromProposal}
+                    disabled={!selectedProposalId}
+                    className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>افزودن</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Add new agenda row (FIRST) */}
             <div className="p-3.5 bg-teal-50/60 border border-teal-200/80 rounded-2xl space-y-3">
               <div className="text-xs font-bold text-teal-950 flex items-center gap-1.5">
@@ -406,7 +491,7 @@ export const CreateMeetingModal: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                <div className="sm:col-span-6">
+                <div className="sm:col-span-5">
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">عنوان موضوع دستور جلسه</label>
                   <input
                     type="text"
@@ -433,17 +518,9 @@ export const CreateMeetingModal: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">مدت (دقیقه)</label>
-                  <input
-                    type="number"
-                    min={5}
-                    max={180}
-                    step={5}
-                    value={newAgendaMinutes}
-                    onChange={(e) => setNewAgendaMinutes(Number(e.target.value))}
-                    className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
-                  />
+                <div className="sm:col-span-3 grid grid-cols-2 gap-1.5">
+                  <PersianTimePicker label="از ساعت" value={newAgendaStartTime} onChange={setNewAgendaStartTime} />
+                  <PersianTimePicker label="تا ساعت" value={newAgendaEndTime} onChange={setNewAgendaEndTime} />
                 </div>
               </div>
 

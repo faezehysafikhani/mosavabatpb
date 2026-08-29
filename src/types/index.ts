@@ -101,15 +101,17 @@ export interface Organization {
   phone?: string;
 }
 
-// Pre-meeting proposal workflow: a unit/person proposes a topic for a future
-// meeting; management reviews and assigns it to a meeting; the office
-// manager (secretary) then turns it into an agenda item on that meeting,
-// after which the existing Meeting -> Resolution workflow takes over.
+// Pre-meeting strategic-request workflow: the office manager (secretary)
+// registers a topic -> CEO approves or rejects it -> a rejected item can be
+// recovered back for reconsideration -> an approved item returns to the
+// office manager's cartable, where it becomes pickable as a ready-made
+// agenda item while creating a new meeting (see CreateMeetingModal), after
+// which the existing Meeting -> Resolution workflow takes over unchanged.
 export type ProposalStatus =
-  | 'PENDING_MANAGEMENT_REVIEW'  // در انتظار بررسی مدیریت
-  | 'REJECTED'                   // رد شده
-  | 'ASSIGNED_TO_MEETING'        // تأیید و تخصیص داده‌شده به جلسه (در انتظار اقدام مسئول دفتر)
-  | 'CONVERTED_TO_AGENDA';       // تبدیل شده به تأیید جلسه (بند دستور جلسه)
+  | 'PENDING_CEO_REVIEW'   // در انتظار بررسی مدیرعامل
+  | 'REJECTED'             // رد شده (قابل بازیافت)
+  | 'APPROVED'             // تایید شده توسط مدیرعامل، آماده افزودن به دستور یک جلسه
+  | 'CONVERTED_TO_AGENDA'; // تبدیل شده به بند دستور یک جلسه
 
 export interface Proposal {
   id: string;
