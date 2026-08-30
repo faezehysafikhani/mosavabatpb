@@ -123,7 +123,7 @@ export const MeetingListView: React.FC = () => {
             <option value="ALL">تمام وضعیت‌ها</option>
             <option value="SCHEDULED">برنامه‌ریزی شده</option>
             <option value="IN_PROGRESS">در حال برگزاری</option>
-            <option value="COMPLETED">برگزار شده / خاتمه یافته</option>
+            <option value="HELD">برگزار شده / خاتمه یافته</option>
             <option value="CANCELLED">لغو شده</option>
           </select>
         </div>

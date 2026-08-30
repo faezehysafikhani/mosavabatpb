@@ -122,23 +122,88 @@
 .theme-glass .app-shell,
 .theme-glass .app-main {
   background:
-    radial-gradient(circle at 15% 10%, rgba(56, 189, 248, 0.22), transparent 32%),
-    radial-gradient(circle at 85% 75%, rgba(37, 99, 235, 0.16), transparent 34%),
-    linear-gradient(145deg, #edf8ff 0%, #f8fbff 48%, #e7f2ff 100%) !important;
+    radial-gradient(circle at 15% 10%, rgba(56, 189, 248, 0.32), transparent 36%),
+    radial-gradient(circle at 85% 75%, rgba(37, 99, 235, 0.26), transparent 38%),
+    linear-gradient(145deg, #dcf0ff 0%, #eef6ff 48%, #d8ecff 100%) !important;
   background-attachment: fixed !important;
 }
 
 .theme-glass .app-surface,
-.theme-glass .app-panel {
-  background: rgba(255, 255, 255, 0.68) !important;
-  border-color: rgba(125, 181, 231, 0.36) !important;
-  box-shadow: 0 10px 35px rgba(30, 100, 180, 0.09) !important;
+.theme-glass .app-panel,
+.theme-glass .bg-white {
+  background: rgba(255, 255, 255, 0.66) !important;
+  border-color: rgba(125, 181, 231, 0.4) !important;
+  box-shadow: 0 10px 35px rgba(30, 100, 180, 0.1) !important;
   backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
 }
 
 .theme-brand .app-panel {
   border-color: rgba(176, 18, 107, 0.12) !important;
   box-shadow: 0 8px 24px rgba(98, 26, 82, 0.06) !important;
+}
+
+/* Blue-glass theme: remap every teal/emerald accent used across the app to
+   blue so the whole UI reads as one consistent blue palette with no green. */
+.theme-glass .bg-teal-50 { background-color: var(--color-blue-50) !important; }
+.theme-glass .bg-teal-100 { background-color: var(--color-blue-100) !important; }
+.theme-glass .bg-teal-200 { background-color: var(--color-blue-200) !important; }
+.theme-glass .bg-teal-400 { background-color: var(--color-blue-400) !important; }
+.theme-glass .bg-teal-500 { background-color: var(--color-blue-500) !important; }
+.theme-glass .bg-teal-600 { background-color: var(--color-blue-600) !important; }
+.theme-glass .bg-teal-700 { background-color: var(--color-blue-700) !important; }
+.theme-glass .bg-teal-800 { background-color: var(--color-blue-800) !important; }
+.theme-glass .bg-teal-950 { background-color: var(--color-blue-950) !important; }
+.theme-glass .bg-emerald-50 { background-color: var(--color-blue-50) !important; }
+.theme-glass .bg-emerald-400 { background-color: var(--color-blue-400) !important; }
+.theme-glass .bg-emerald-600 { background-color: var(--color-blue-600) !important; }
+.theme-glass .bg-emerald-700 { background-color: var(--color-blue-700) !important; }
+.theme-glass .bg-emerald-950 { background-color: var(--color-blue-950) !important; }
+
+.theme-glass .text-teal-100 { color: var(--color-blue-100) !important; }
+.theme-glass .text-teal-200 { color: var(--color-blue-200) !important; }
+.theme-glass .text-teal-300 { color: var(--color-blue-300) !important; }
+.theme-glass .text-teal-400 { color: var(--color-blue-400) !important; }
+.theme-glass .text-teal-500 { color: var(--color-blue-500) !important; }
+.theme-glass .text-teal-600 { color: var(--color-blue-600) !important; }
+.theme-glass .text-teal-700 { color: var(--color-blue-700) !important; }
+.theme-glass .text-teal-800 { color: var(--color-blue-800) !important; }
+.theme-glass .text-teal-900 { color: var(--color-blue-900) !important; }
+.theme-glass .text-teal-950 { color: var(--color-blue-950) !important; }
+.theme-glass .text-emerald-300 { color: var(--color-blue-300) !important; }
+.theme-glass .text-emerald-500 { color: var(--color-blue-500) !important; }
+.theme-glass .text-emerald-600 { color: var(--color-blue-600) !important; }
+.theme-glass .text-emerald-700 { color: var(--color-blue-700) !important; }
+.theme-glass .text-emerald-900 { color: var(--color-blue-900) !important; }
+
+.theme-glass .border-teal-100 { border-color: var(--color-blue-100) !important; }
+.theme-glass .border-teal-200 { border-color: var(--color-blue-200) !important; }
+.theme-glass .border-teal-300 { border-color: var(--color-blue-300) !important; }
+.theme-glass .border-teal-400 { border-color: var(--color-blue-400) !important; }
+.theme-glass .border-teal-500 { border-color: var(--color-blue-500) !important; }
+.theme-glass .border-teal-600 { border-color: var(--color-blue-600) !important; }
+.theme-glass .border-teal-700 { border-color: var(--color-blue-700) !important; }
+.theme-glass .border-teal-800 { border-color: var(--color-blue-800) !important; }
+.theme-glass .border-emerald-200 { border-color: var(--color-blue-200) !important; }
+.theme-glass .border-emerald-400 { border-color: var(--color-blue-400) !important; }
+.theme-glass .border-emerald-800 { border-color: var(--color-blue-800) !important; }
+
+.theme-glass .ring-teal-200 { --tw-ring-color: var(--color-blue-200) !important; }
+.theme-glass .ring-teal-400 { --tw-ring-color: var(--color-blue-400) !important; }
+.theme-glass .ring-teal-500 { --tw-ring-color: var(--color-blue-500) !important; }
+.theme-glass .ring-teal-900 { --tw-ring-color: var(--color-blue-900) !important; }
+
+/* Re-assert modal header icon-badge treatment after the blanket teal->blue
+   remap above, so header badges stay a translucent overlay instead of a
+   solid block regardless of the active theme. */
+.app-modal-header .bg-teal-800,
+.app-modal-header .bg-teal-900 {
+  background: rgba(255, 255, 255, 0.13) !important;
+}
+
+.app-modal-header .text-teal-200,
+.app-modal-header .text-teal-300 {
+  color: rgba(255, 255, 255, 0.88) !important;
 }
 
 /* Custom smooth scrollbar */

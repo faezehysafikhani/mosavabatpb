@@ -78,6 +78,8 @@ export interface User {
   organizationId: string;
   organizationName: string;
   avatarUrl?: string;
+  birthDateJalali?: string;
+  signatureUrl?: string;
   isActive: boolean;
   permissions: string[];
 }

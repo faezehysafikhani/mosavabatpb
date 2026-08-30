@@ -103,7 +103,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [createMeetingInitialDate, setCreateMeetingInitialDate] = useState<string>('۱۴۰۳/۰۷/۰۵');
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState<boolean>(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
-  const [appTheme, setAppThemeState] = useState<AppTheme>('brand');
+  const [appTheme, setAppThemeState] = useState<AppTheme>('glass');
   const isDarkMode = appTheme === 'dark';
   const [resolutionModalState, setResolutionModalState] = useState<CreateResolutionModalState>({
     isOpen: false,
@@ -120,7 +120,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const savedTheme = localStorage.getItem('app-theme');
     const initialTheme: AppTheme = savedTheme === 'dark' || savedTheme === 'glass' || savedTheme === 'brand'
       ? savedTheme
-      : 'brand';
+      : 'glass';
     setAppThemeState(initialTheme);
     applyTheme(initialTheme);
   }, []);
