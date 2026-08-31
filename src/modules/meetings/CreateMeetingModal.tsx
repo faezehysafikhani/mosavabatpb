@@ -19,13 +19,14 @@ const getMinutesDiff = (start: string, end: string): number => {
 };
 
 export const CreateMeetingModal: React.FC = () => {
-  const { 
-    isCreateMeetingOpen, 
-    setIsCreateMeetingOpen, 
+  const {
+    isCreateMeetingOpen,
+    setIsCreateMeetingOpen,
     createMeetingInitialDate,
-    availableUsers, 
-    showToast, 
-    triggerRefresh 
+    availableUsers,
+    showToast,
+    triggerRefresh,
+    hasPermission
   } = useApp();
 
   const [title, setTitle] = useState('');
@@ -178,6 +179,10 @@ export const CreateMeetingModal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission('CREATE_MEETING')) {
+      showToast('دسترسی غیرمجاز', 'شما مجاز به ایجاد جلسه جدید نیستید.', 'error');
+      return;
+    }
     if (!title.trim()) {
       showToast('خطا', 'عنوان جلسه الزامی است.', 'error');
       return;

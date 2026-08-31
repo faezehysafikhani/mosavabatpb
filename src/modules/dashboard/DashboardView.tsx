@@ -36,7 +36,7 @@ import { mockDepartments } from '../../mock/data';
 const CHART_PALETTE = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#0ea5e9', '#ef4444'];
 
 export const DashboardView: React.FC = () => {
-  const { navigateTo, setIsCreateMeetingOpen, currentUser, refreshTrigger } = useApp();
+  const { navigateTo, setIsCreateMeetingOpen, currentUser, refreshTrigger, hasPermission } = useApp();
 
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [recentMeetings, setRecentMeetings] = useState<Meeting[]>([]);
@@ -121,13 +121,15 @@ export const DashboardView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setIsCreateMeetingOpen(true)}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-full shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>جلسه جدید</span>
-          </button>
+          {hasPermission('CREATE_MEETING') && (
+            <button
+              onClick={() => setIsCreateMeetingOpen(true)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-full shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>جلسه جدید</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -548,8 +550,8 @@ export const DashboardView: React.FC = () => {
                     <td className="py-3 px-3 text-slate-500">{toPersianDigits(res.assignedDateJalali || '۱۴۰۳/۰۶/۱۰')}</td>
                     <td className="py-3 px-3 text-slate-500">{toPersianDigits(res.deadlineJalali || '۱۴۰۳/۰۷/۱۵')}</td>
                     <td className="py-3 px-3">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${sMeta.bg}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${sMeta.dot}`}></span>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap ${sMeta.bg}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sMeta.dot}`}></span>
                         <span>{sMeta.label}</span>
                       </span>
                     </td>

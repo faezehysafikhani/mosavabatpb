@@ -34,7 +34,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   defaultAgendaItemId,
   defaultTopicTitle,
 }) => {
-  const { availableUsers, showToast, triggerRefresh } = useApp();
+  const { availableUsers, showToast, triggerRefresh, hasPermission } = useApp();
   const [meetingOptions, setMeetingOptions] = useState<Meeting[]>(mockMeetings);
 
   const [selectedMeetingId, setSelectedMeetingId] = useState(defaultMeetingId || '');
@@ -98,6 +98,10 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasPermission('CREATE_RESOLUTION')) {
+      showToast('دسترسی غیرمجاز', 'شما مجاز به ثبت مصوبه جدید نیستید.', 'error');
+      return;
+    }
     if (!topicTitle.trim()) {
       showToast('خطا', 'عنوان مصوبه الزامی است.', 'error');
       return;

@@ -78,15 +78,11 @@ export const Sidebar: React.FC = () => {
       id: 'meetings_resolutions',
       title: 'جلسات و مصوبات',
       items: [
-        ...(currentUser.role === 'ADMIN' || currentUser.role === 'CEO' || currentUser.role === 'SECRETARY'
-          ? [
-              {
-                route: 'proposals' as AppRoute,
-                title: 'مصوبات پیشنهادی',
-                icon: Lightbulb,
-              },
-            ]
-          : []),
+        {
+          route: 'proposals' as AppRoute,
+          title: 'مصوبات پیشنهادی',
+          icon: Lightbulb,
+        },
         {
           route: 'meetings' as AppRoute,
           title: 'مدیریت جلسات',
@@ -169,7 +165,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`app-surface bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-start shrink-0 z-30 h-full select-none shadow-xs ${
+      className={`no-print app-surface bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-l border-slate-200 dark:border-slate-800 transition-all duration-300 flex flex-col justify-start shrink-0 z-30 h-full select-none shadow-xs ${
         isSidebarCollapsed ? 'w-16' : 'w-60'
       }`}
     >

@@ -16,6 +16,9 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
 
   if (!isOpen) return null;
 
+  const isOfficeManager = currentUser.role === 'ADMIN' || currentUser.role === 'SECRETARY';
+  const requiresOfficeReview = !isOfficeManager;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
@@ -28,11 +31,17 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
         title: title.trim(),
         description: description.trim(),
         proposerName: currentUser.fullName,
+        proposerUserId: currentUser.id,
         proposerDepartmentId: currentUser.departmentId,
         proposerDepartmentName: currentUser.departmentName,
         dateJalali: '۱۴۰۳/۰۶/۲۸',
+        requiresOfficeReview,
       });
-      showToast('ثبت مصوبه پیشنهادی', 'برای بررسی به کارتابل مدیرعامل ارسال شد.', 'success');
+      showToast(
+        'ثبت مصوبه پیشنهادی',
+        requiresOfficeReview ? 'برای بررسی به کارتابل مسئول دفتر ارسال شد.' : 'برای بررسی به کارتابل مدیرعامل ارسال شد.',
+        'success'
+      );
       setTitle('');
       setDescription('');
       triggerRefresh();
@@ -52,7 +61,9 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">ثبت مصوبه پیشنهادی جدید</h3>
-              <p className="text-[11px] text-teal-200">برای بررسی و تصمیم مدیرعامل ارسال می‌شود</p>
+              <p className="text-[11px] text-teal-200">
+                {requiresOfficeReview ? 'برای بررسی مسئول دفتر و سپس تصمیم مدیرعامل ارسال می‌شود' : 'برای بررسی و تصمیم مدیرعامل ارسال می‌شود'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="text-teal-200 hover:text-white p-1 rounded-lg hover:bg-teal-800">
@@ -87,7 +98,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             </button>
             <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer">
               <Send className="w-4 h-4" />
-              <span>{isSubmitting ? 'در حال ارسال...' : 'ارسال به کارتابل مدیرعامل'}</span>
+              <span>{isSubmitting ? 'در حال ارسال...' : requiresOfficeReview ? 'ارسال به کارتابل مسئول دفتر' : 'ارسال به کارتابل مدیرعامل'}</span>
             </button>
           </div>
         </form>

@@ -8,10 +8,11 @@ import { Proposal, ProposalStatus } from '../../types';
 import { toPersianDigits } from '../../utils/formatters';
 import { CreateProposalModal } from './CreateProposalModal';
 
-type ProposalTab = 'OFFICE' | 'CEO';
-type OfficeStatusFilter = 'APPROVED' | 'CONFIRMED_FOR_MEETING' | 'CONVERTED_TO_AGENDA' | 'REJECTED' | 'ALL';
+type ProposalTab = 'OFFICE' | 'CEO' | 'MINE';
+type OfficeStatusFilter = 'PENDING_OFFICE_REVIEW' | 'APPROVED' | 'CONFIRMED_FOR_MEETING' | 'CONVERTED_TO_AGENDA' | 'REJECTED' | 'ALL';
 
 const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
+  PENDING_OFFICE_REVIEW: { label: 'در انتظار بررسی مسئول دفتر', bg: 'bg-sky-50 text-sky-700 border-sky-200' },
   PENDING_CEO_REVIEW: { label: 'در انتظار بررسی مدیرعامل', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
   REJECTED: { label: 'رد شده', bg: 'bg-rose-50 text-rose-700 border-rose-200' },
   APPROVED: { label: 'تایید جلسات تایید نشده', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -23,6 +24,7 @@ const DEFAULT_STATUS_META = { label: 'نامشخص', bg: 'bg-slate-50 text-slate
 const getStatusMeta = (status: ProposalStatus) => STATUS_META[status] || DEFAULT_STATUS_META;
 
 const OFFICE_FILTERS: { id: OfficeStatusFilter; label: string }[] = [
+  { id: 'PENDING_OFFICE_REVIEW', label: 'در انتظار بررسی من' },
   { id: 'APPROVED', label: 'تایید جلسات تایید نشده' },
   { id: 'CONFIRMED_FOR_MEETING', label: 'تایید جلسه شده' },
   { id: 'CONVERTED_TO_AGENDA', label: 'تبدیل شده به جلسه' },
@@ -35,10 +37,11 @@ export const ProposalsView: React.FC = () => {
 
   const isOfficeManager = currentUser.role === 'ADMIN' || currentUser.role === 'SECRETARY';
   const isCeo = currentUser.role === 'ADMIN' || currentUser.role === 'CEO';
+  const isRegularUser = !isOfficeManager && !isCeo;
 
-  const [tab, setTab] = useState<ProposalTab>(isOfficeManager ? 'OFFICE' : 'CEO');
+  const [tab, setTab] = useState<ProposalTab>(isOfficeManager ? 'OFFICE' : isCeo ? 'CEO' : 'MINE');
   const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [officeFilter, setOfficeFilter] = useState<OfficeStatusFilter>('APPROVED');
+  const [officeFilter, setOfficeFilter] = useState<OfficeStatusFilter>('PENDING_OFFICE_REVIEW');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
   const [confirmingProposal, setConfirmingProposal] = useState<Proposal | null>(null);
@@ -63,6 +66,12 @@ export const ProposalsView: React.FC = () => {
       decision === 'APPROVED' ? 'success' : 'warning'
     );
     setDecisionNotes((prev) => ({ ...prev, [proposal.id]: '' }));
+    triggerRefresh();
+  };
+
+  const handleForwardToCeo = async (proposal: Proposal) => {
+    await proposalService.forwardToCeo(proposal.id);
+    showToast('ارسال برای مدیرعامل', `«${proposal.title}» برای بررسی مدیرعامل ارسال شد.`, 'success');
     triggerRefresh();
   };
 
@@ -92,10 +101,12 @@ export const ProposalsView: React.FC = () => {
 
   const ceoQueue = proposals.filter((p) => p.status === 'PENDING_CEO_REVIEW');
   const officeItems = proposals.filter((p) => officeFilter === 'ALL' || p.status === officeFilter);
+  const myProposals = proposals.filter((p) => p.proposerUserId === currentUser.id);
 
   const visibleTabs: { id: ProposalTab; label: string; count: number; icon: React.ElementType }[] = [
-    ...(isOfficeManager ? [{ id: 'OFFICE' as ProposalTab, label: 'مسئول دفتر', count: proposals.filter((p) => p.status === 'APPROVED').length, icon: Lightbulb }] : []),
+    ...(isOfficeManager ? [{ id: 'OFFICE' as ProposalTab, label: 'مسئول دفتر', count: proposals.filter((p) => p.status === 'PENDING_OFFICE_REVIEW' || p.status === 'APPROVED').length, icon: Lightbulb }] : []),
     ...(isCeo ? [{ id: 'CEO' as ProposalTab, label: 'کارتابل مدیرعامل', count: ceoQueue.length, icon: Inbox }] : []),
+    ...(isRegularUser ? [{ id: 'MINE' as ProposalTab, label: 'مصوبات پیشنهادی من', count: myProposals.length, icon: Lightbulb }] : []),
   ];
 
   return (
@@ -106,7 +117,7 @@ export const ProposalsView: React.FC = () => {
           <span>مصوبات پیشنهادی</span>
         </h1>
         <p className="text-xs text-slate-400 font-medium mt-0.5">
-          ثبت مصوبه پیشنهادی توسط مسئول دفتر، بررسی و تصمیم مدیرعامل، و تبدیل موارد تأییدشده به تایید جلسه
+          ثبت مصوبه پیشنهادی توسط کارکنان و مسئول دفتر، بررسی مسئول دفتر و مدیرعامل، و تبدیل موارد تأییدشده به تایید جلسه
         </p>
 
         {visibleTabs.length > 1 && (
@@ -177,6 +188,18 @@ export const ProposalsView: React.FC = () => {
                       <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${getStatusMeta(p.status).bg}`}>{getStatusMeta(p.status).label}</span>
                     </td>
                     <td className="py-3 px-3">
+                      {p.status === 'PENDING_OFFICE_REVIEW' && (
+                        <div className="flex items-center gap-1.5">
+                          <button onClick={() => handleForwardToCeo(p)} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>ارسال برای مدیرعامل</span>
+                          </button>
+                          <button onClick={() => handleReview(p, 'REJECTED')} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>رد</span>
+                          </button>
+                        </div>
+                      )}
                       {p.status === 'APPROVED' && (
                         <button onClick={() => handleOpenConfirm(p)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
                           <FileCheck2 className="w-3.5 h-3.5" />
@@ -226,6 +249,34 @@ export const ProposalsView: React.FC = () => {
                   <span>رد</span>
                 </button>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'MINE' && isRegularUser && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button onClick={() => setIsCreateOpen(true)} className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs cursor-pointer">
+              <Plus className="w-3.5 h-3.5" />
+              <span>ثبت مصوبه پیشنهادی جدید</span>
+            </button>
+          </div>
+
+          {myProposals.length === 0 ? (
+            <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
+              هنوز مصوبه پیشنهادی ثبت نکرده‌اید.
+            </div>
+          ) : myProposals.map((p) => (
+            <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
+                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${getStatusMeta(p.status).bg}`}>{getStatusMeta(p.status).label}</span>
+              </div>
+              <p className="text-xs text-slate-600">{p.description}</p>
+              {p.managementDecisionNotes && (
+                <p className="text-[11px] text-slate-500">یادداشت تصمیم: {p.managementDecisionNotes}</p>
+              )}
             </div>
           ))}
         </div>

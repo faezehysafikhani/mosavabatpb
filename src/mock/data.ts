@@ -126,7 +126,7 @@ export const mockUsers: User[] = [
     organizationName: 'سازمان مرکزی فناوری و اطلاعات',
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
     isActive: true,
-    permissions: ['VIEW_ALL', 'CREATE_MEETING', 'VERIFY_RESOLUTION', 'VIEW_REPORTS'],
+    permissions: ['VIEW_ALL', 'VERIFY_RESOLUTION', 'VIEW_REPORTS'],
   },
   {
     id: 'user-4',
@@ -142,7 +142,7 @@ export const mockUsers: User[] = [
     organizationName: 'سازمان مرکزی فناوری و اطلاعات',
     avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
     isActive: true,
-    permissions: ['VIEW_ALL', 'CREATE_RESOLUTION', 'VERIFY_RESOLUTION'],
+    permissions: ['VIEW_ALL', 'VERIFY_RESOLUTION'],
   },
   {
     id: 'user-5',

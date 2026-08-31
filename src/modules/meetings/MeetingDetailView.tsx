@@ -1,29 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { meetingService, resolutionService } from '../../services';
 import { Meeting, Resolution } from '../../types';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Users, 
-  FileText, 
-  ArrowRight, 
-  Printer, 
-  Plus, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  FileText,
+  ArrowRight,
+  Printer,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
   ShieldCheck,
   Building,
   UserCheck,
   Layers,
   ChevronLeft,
   FileCheck2,
-  ExternalLink
+  ExternalLink,
+  FileDown
 } from 'lucide-react';
 import { toPersianDigits, getMeetingTypeLabel, getMeetingStatusMeta, getResolutionExecutionMeta, getPriorityMeta } from '../../utils/formatters';
 import { AttachmentList } from '../../components/common/AttachmentList';
 import { TimelineView } from '../../components/common/TimelineView';
+import { exportHtmlToPdf } from '../../utils/pdfExport';
 
 interface MeetingDetailViewProps {
   meetingId: string;
@@ -31,12 +33,14 @@ interface MeetingDetailViewProps {
 }
 
 export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId }) => {
-  const { navigateTo, showToast, refreshTrigger, openCreateResolutionModal } = useApp();
+  const { navigateTo, showToast, refreshTrigger, openCreateResolutionModal, hasPermission } = useApp();
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
   const [activeTab, setActiveTab] = useState<'AGENDAS' | 'RESOLUTIONS' | 'MEMBERS' | 'ATTACHMENTS' | 'MINUTES_PRINT'>('AGENDAS');
   const [loading, setLoading] = useState(true);
+  const printableRef = useRef<HTMLDivElement>(null);
+  const canCreateResolution = hasPermission('CREATE_RESOLUTION');
 
   useEffect(() => {
     loadMeetingDetails();
@@ -63,11 +67,14 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
     }
   };
 
-  const handlePrintMinutes = () => {
-    setActiveTab('MINUTES_PRINT');
-    setTimeout(() => {
-      window.print();
-    }, 300);
+  const handlePrintMinutesPreview = () => {
+    window.print();
+  };
+
+  const handleExportMinutesPdf = () => {
+    const html = printableRef.current?.innerHTML || '';
+    const opened = exportHtmlToPdf(`صورتجلسه ${meeting?.meetingNumber || ''}`, html);
+    showToast(opened ? 'خروجی PDF' : 'خطای خروجی', opened ? 'نسخه PDF صورتجلسه در پنجره جدید باز شد.' : 'مرورگر اجازه باز شدن پنجره PDF را نداد.', opened ? 'success' : 'error');
   };
 
   const handleRegisterResolutionForAgenda = (agendaId: string, agendaTitle: string) => {
@@ -92,7 +99,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
   return (
     <div className="space-y-5 pb-16">
       {/* Top Navigation & Actions Bar */}
-      <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+      <div className="no-print bg-white rounded-2xl p-4 shadow-xs border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => navigateTo('meetings')}
           className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-teal-800 transition-colors cursor-pointer"
@@ -101,27 +108,21 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
           <span>بازگشت به لیست جلسات</span>
         </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePrintMinutes}
-            className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-xl border border-slate-200 transition-colors cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-            <span>چاپ صورتجلسه رسمی</span>
-          </button>
-
-          <button
-            onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
-            className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>ثبت مصوبه جدید برای این جلسه</span>
-          </button>
-        </div>
+        {canCreateResolution && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
+              className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>ثبت مصوبه جدید برای این جلسه</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Meeting Banner Header */}
-      <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
+      <div className="no-print bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="text-xs font-black text-teal-800 bg-teal-50 px-3 py-1 rounded-xl border border-teal-200">
@@ -190,7 +191,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
       </div>
 
       {/* Tabs Menu - Tab 1 is "دستور جلسه و مذاکرات" */}
-      <div className="flex border-b border-slate-200 bg-white rounded-2xl p-1.5 shadow-xs gap-1.5 overflow-x-auto">
+      <div className="no-print flex border-b border-slate-200 bg-white rounded-2xl p-1.5 shadow-xs gap-1.5 overflow-x-auto">
         <button
           onClick={() => setActiveTab('AGENDAS')}
           className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
@@ -296,13 +297,15 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                     </div>
 
                     {/* Prominent Button: ثبت مصوبه برای این بند (Requirement 9) */}
-                    <button
-                      onClick={() => handleRegisterResolutionForAgenda(ag.id, ag.title)}
-                      className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition-all cursor-pointer"
-                    >
-                      <FileCheck2 className="w-4 h-4" />
-                      <span>ثبت مصوبه برای این بند</span>
-                    </button>
+                    {canCreateResolution && (
+                      <button
+                        onClick={() => handleRegisterResolutionForAgenda(ag.id, ag.title)}
+                        className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition-all cursor-pointer"
+                      >
+                        <FileCheck2 className="w-4 h-4" />
+                        <span>ثبت مصوبه برای این بند</span>
+                      </button>
+                    )}
                   </div>
 
                   {ag.outcomeNotes && (
@@ -359,13 +362,15 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
           {resolutions.length === 0 ? (
             <div className="text-center py-10 text-slate-400 text-xs space-y-2">
               <p>هنوز هیچ مصوبه‌ای برای این جلسه ثبت نشده است.</p>
-              <button
-                onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
-                className="inline-flex items-center gap-1.5 text-teal-800 font-bold text-xs hover:underline cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>اولین مصوبه را ثبت فرمایید</span>
-              </button>
+              {canCreateResolution && (
+                <button
+                  onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
+                  className="inline-flex items-center gap-1.5 text-teal-800 font-bold text-xs hover:underline cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>اولین مصوبه را ثبت فرمایید</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -384,7 +389,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                         <span className="text-xs font-black text-teal-800 bg-teal-100/60 px-2.5 py-0.5 rounded-md">
                           بند {toPersianDigits(index + 1)}: {res.resolutionNumber}
                         </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${sMeta.bg}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${sMeta.bg}`}>
                           {sMeta.label}
                         </span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pMeta.bg} ${pMeta.text}`}>
@@ -461,7 +466,27 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
 
       {/* Tab 5: Official Minutes Preview & Print */}
       {activeTab === 'MINUTES_PRINT' && (
-        <div className="bg-white rounded-3xl p-8 shadow-xs border border-slate-200/90 space-y-6 text-slate-900 printable-minutes">
+        <div className="space-y-3">
+          <div className="no-print flex items-center justify-end gap-2">
+            <button
+              onClick={handlePrintMinutesPreview}
+              title="چاپ صورتجلسه"
+              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+              <span>چاپ</span>
+            </button>
+            <button
+              onClick={handleExportMinutesPdf}
+              title="نمایش نسخه PDF"
+              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2 px-3.5 rounded-xl border border-slate-200 transition-colors cursor-pointer"
+            >
+              <FileDown className="w-4 h-4" />
+              <span>PDF</span>
+            </button>
+          </div>
+
+          <div ref={printableRef} className="bg-white rounded-3xl p-8 shadow-xs border border-slate-200/90 space-y-6 text-slate-900 printable-minutes">
           <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
             <h2 className="text-base font-black">صورتجلسه رسمی مصوبات سازمان</h2>
             <p className="text-xs font-bold">شماره جلسه: {meeting.meetingNumber} | تاریخ: {toPersianDigits(meeting.dateJalali)}</p>
@@ -491,6 +516,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
             <div>امضای رئیس جلسه</div>
             <div>امضای دبیر جلسه</div>
             <div>مهر و امضای اعضای حاضر</div>
+          </div>
           </div>
         </div>
       )}

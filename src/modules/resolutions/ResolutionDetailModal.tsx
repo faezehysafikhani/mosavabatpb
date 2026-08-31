@@ -184,10 +184,10 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
                 <span className="text-xs font-black text-teal-200 bg-teal-800/80 px-2.5 py-0.5 rounded-lg border border-teal-600/40">
                   {resolution.resolutionNumber}
                 </span>
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${appMeta.bg}`}>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${appMeta.bg}`}>
                   {appMeta.label}
                 </span>
-                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${execMeta.bg}`}>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${execMeta.bg}`}>
                   {execMeta.label}
                 </span>
               </div>

@@ -9,10 +9,12 @@ const STORAGE_KEY = 'proposals';
 export interface CreateProposalDto {
   title: string;
   proposerName: string;
+  proposerUserId?: string;
   proposerDepartmentId: string;
   proposerDepartmentName: string;
   description: string;
   dateJalali: string;
+  requiresOfficeReview?: boolean;
 }
 
 const getCurrentTimeString = (): string => toPersianDigits(
@@ -23,6 +25,7 @@ export interface IProposalService {
   getProposals(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Proposal>>>;
   createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>>;
   reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>>;
+  forwardToCeo(id: string): Promise<ApiResponse<Proposal>>;
   recoverProposal(id: string): Promise<ApiResponse<Proposal>>;
   confirmForMeeting(id: string, presenterId: string, presenterName: string): Promise<ApiResponse<Proposal>>;
   markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>>;
@@ -57,16 +60,27 @@ class MockProposalService implements IProposalService {
 
   public async createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
+    const { requiresOfficeReview, ...rest } = dto;
     const newProposal: Proposal = {
       id: `prop-${Date.now()}`,
-      ...dto,
+      ...rest,
       attachments: [],
-      status: 'PENDING_CEO_REVIEW',
+      status: requiresOfficeReview ? 'PENDING_OFFICE_REVIEW' : 'PENDING_CEO_REVIEW',
       createdAt: new Date().toISOString(),
     };
     proposals.unshift(newProposal);
     this.saveData(proposals);
     return apiClient.simulateNetwork(newProposal, 150);
+  }
+
+  public async forwardToCeo(id: string): Promise<ApiResponse<Proposal>> {
+    const proposals = this.getData();
+    const proposal = proposals.find((p) => p.id === id);
+    if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
+    if (proposal.status !== 'PENDING_OFFICE_REVIEW') throw new Error('فقط موارد در انتظار بررسی مسئول دفتر قابل ارسال برای مدیرعامل هستند');
+    proposal.status = 'PENDING_CEO_REVIEW';
+    this.saveData(proposals);
+    return apiClient.simulateNetwork(proposal, 120);
   }
 
   public async reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>> {

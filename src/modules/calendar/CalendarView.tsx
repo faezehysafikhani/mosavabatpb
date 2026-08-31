@@ -32,7 +32,8 @@ const PERSIAN_MONTHS = [
 const PERSIAN_YEARS = [1401, 1402, 1403, 1404, 1405];
 
 export const CalendarView: React.FC = () => {
-  const { navigateTo, openCreateMeetingModal, isDarkMode } = useApp();
+  const { navigateTo, openCreateMeetingModal, isDarkMode, hasPermission } = useApp();
+  const canCreateMeeting = hasPermission('CREATE_MEETING');
 
   const [selectedYear, setSelectedYear] = useState<number>(1403);
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(6); // 6 = مهر (index 6, 7th month)
@@ -90,6 +91,7 @@ export const CalendarView: React.FC = () => {
 
   // Handle clicking on a calendar day
   const handleDayClick = (day: number) => {
+    if (!canCreateMeeting) return;
     const dateStr = formatJalaliDate(day);
     openCreateMeetingModal(dateStr);
   };
@@ -174,13 +176,15 @@ export const CalendarView: React.FC = () => {
           </div>
 
           {/* New Meeting Button */}
-          <button
-            onClick={() => openCreateMeetingModal()}
-            className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>جلسه جدید</span>
-          </button>
+          {canCreateMeeting && (
+            <button
+              onClick={() => openCreateMeetingModal()}
+              className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>جلسه جدید</span>
+            </button>
+          )}
         </div>
       </div>
 

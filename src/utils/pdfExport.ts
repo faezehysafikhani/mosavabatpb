@@ -10,6 +10,30 @@ const escapeHtml = (value: unknown) => String(value ?? '—')
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#039;');
 
+export const exportHtmlToPdf = (title: string, bodyHtml: string): boolean => {
+  const printWindow = window.open('', '_blank', 'width=1000,height=800');
+  if (!printWindow) return false;
+
+  printWindow.document.write(`<!doctype html>
+    <html lang="fa" dir="rtl">
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(title)}</title>
+        <style>
+          @page { size: A4; margin: 14mm; }
+          * { box-sizing: border-box; }
+          body { font-family: Tahoma, Arial, sans-serif; color: #172033; margin: 0; direction: rtl; }
+        </style>
+      </head>
+      <body>
+        ${bodyHtml}
+        <script>window.addEventListener('load', () => { window.print(); });<\/script>
+      </body>
+    </html>`);
+  printWindow.document.close();
+  return true;
+};
+
 export const exportListToPdf = <T,>(title: string, items: T[], columns: PdfColumn<T>[]): boolean => {
   const printWindow = window.open('', '_blank', 'width=1100,height=800');
   if (!printWindow) return false;

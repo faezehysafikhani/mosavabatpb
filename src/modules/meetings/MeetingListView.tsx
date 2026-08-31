@@ -23,7 +23,7 @@ import { ListViewActions, ListViewMode } from '../../components/common/ListViewA
 import { exportListToPdf } from '../../utils/pdfExport';
 
 export const MeetingListView: React.FC = () => {
-  const { navigateTo, setIsCreateMeetingOpen, showToast, refreshTrigger, currentUser } = useApp();
+  const { navigateTo, setIsCreateMeetingOpen, showToast, refreshTrigger, currentUser, hasPermission } = useApp();
   
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -89,13 +89,15 @@ export const MeetingListView: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <ListViewActions filtersOpen={filtersOpen} onToggleFilters={() => setFiltersOpen((value) => !value)} viewMode={viewMode} onViewModeChange={setViewMode} onExportPdf={handleExportList} />
 
-          <button
-            onClick={() => setIsCreateMeetingOpen(true)}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-full shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>ایجاد جلسه جدید</span>
-          </button>
+          {hasPermission('CREATE_MEETING') && (
+            <button
+              onClick={() => setIsCreateMeetingOpen(true)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-4 rounded-full shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>ایجاد جلسه جدید</span>
+            </button>
+          )}
         </div>
       </div>
 

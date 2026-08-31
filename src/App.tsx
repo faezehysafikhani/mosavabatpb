@@ -22,17 +22,30 @@ import { UsersView } from './modules/users/UsersView';
 import { UserGuideView } from './modules/guide/UserGuideView';
 import { SettingsView } from './modules/settings/SettingsView';
 
-import { Sparkles, Bot } from 'lucide-react';
+import { Sparkles, Bot, ShieldAlert } from 'lucide-react';
+
+const AccessDenied: React.FC = () => (
+  <div className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center border border-slate-200 dark:border-slate-800 shadow-xs">
+    <ShieldAlert className="w-10 h-10 text-rose-400 mx-auto mb-3" />
+    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200">دسترسی غیرمجاز</h3>
+    <p className="text-xs text-slate-400 mt-1">شما مجوز دسترسی به این بخش را ندارید.</p>
+  </div>
+);
 
 const AppContent: React.FC = () => {
-  const { 
-    currentRoute, 
-    selectedMeetingId, 
+  const {
+    currentRoute,
+    selectedMeetingId,
     setIsAiAssistantOpen,
     resolutionModalState,
     closeCreateResolutionModal,
-    isDarkMode
+    isDarkMode,
+    currentUser,
+    hasPermission
   } = useApp();
+
+  const canManageUsers = currentUser.role === 'ADMIN' || hasPermission('MANAGE_USERS');
+  const canViewApprovals = hasPermission('VIEW_APPROVALS') || currentUser.role === 'ADMIN' || currentUser.role === 'DEPT_MANAGER' || currentUser.role === 'CEO';
 
   const renderCurrentView = () => {
     switch (currentRoute) {
@@ -49,17 +62,17 @@ const AppContent: React.FC = () => {
       case 'tasks':
         return <MyTasksView />;
       case 'approvals':
-        return <ApprovalsView />;
+        return canViewApprovals ? <ApprovalsView /> : <AccessDenied />;
       case 'reports':
         return <ReportsView />;
       case 'calendar':
         return <CalendarView />;
       case 'users':
-        return <UsersView />;
+        return canManageUsers ? <UsersView /> : <AccessDenied />;
       case 'guide':
         return <UserGuideView />;
       case 'settings':
-        return <SettingsView />;
+        return canManageUsers ? <SettingsView /> : <AccessDenied />;
       default:
         return <DashboardView />;
     }
@@ -84,7 +97,7 @@ const AppContent: React.FC = () => {
       </div>
 
       {/* Floating AI Assistant Trigger */}
-      <div className="fixed bottom-5 left-5 z-40">
+      <div className="no-print fixed bottom-5 left-5 z-40">
         <button
           onClick={() => setIsAiAssistantOpen(true)}
           className="group relative flex items-center gap-2 bg-slate-900 dark:bg-teal-800 text-white font-bold text-xs py-2 px-3.5 rounded-full shadow-lg hover:shadow-xl border border-slate-700 dark:border-teal-600 hover:scale-105 transition-all cursor-pointer"

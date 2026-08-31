@@ -143,6 +143,21 @@
   box-shadow: 0 8px 24px rgba(98, 26, 82, 0.06) !important;
 }
 
+/* The header and its dropdown panels must stay readable under the glass
+   theme: override the blanket .bg-white glass treatment above with a
+   near-solid background and no blur, while keeping its border/shadow. */
+.theme-glass header.app-surface {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.theme-glass header .absolute.bg-white {
+  background: rgba(255, 255, 255, 0.99) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* Blue-glass theme: remap every teal/emerald accent used across the app to
    blue so the whole UI reads as one consistent blue palette with no green. */
 .theme-glass .bg-teal-50 { background-color: var(--color-blue-50) !important; }
@@ -297,5 +312,19 @@
   body {
     background: white !important;
     color: black !important;
+  }
+  .app-shell,
+  .app-main {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+  .printable-minutes {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
   }
 }

@@ -113,6 +113,7 @@ export interface Organization {
 // manager also sets its time slot -> the existing Meeting -> Resolution
 // workflow takes over unchanged from there.
 export type ProposalStatus =
+  | 'PENDING_OFFICE_REVIEW'  // ثبت شده توسط کاربر عادی، در انتظار بررسی مسئول دفتر
   | 'PENDING_CEO_REVIEW'     // در انتظار بررسی مدیرعامل
   | 'REJECTED'               // رد شده (فقط قابل بازیافت)
   | 'APPROVED'               // تایید شده توسط مدیرعامل، در انتظار تبدیل به تایید جلسه توسط مسئول دفتر
@@ -123,6 +124,7 @@ export interface Proposal {
   id: string;
   title: string;
   proposerName: string;
+  proposerUserId?: string;
   proposerDepartmentId: string;
   proposerDepartmentName: string;
   description: string;

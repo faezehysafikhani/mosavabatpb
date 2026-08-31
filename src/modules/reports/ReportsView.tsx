@@ -213,7 +213,7 @@ export const ReportsView: React.FC = () => {
                   <div key={res.id} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-bold text-slate-800">{res.topicTitle}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${meta.bg}`}>{meta.label}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${meta.bg}`}>{meta.label}</span>
                     </div>
                     <div className="text-[11px] text-slate-500 mt-1">
                       مسئول: {res.mainResponsibleName || 'تعیین نشده'} — مهلت: {toPersianDigits(res.deadlineJalali || '—')}

@@ -160,7 +160,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="app-surface h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-40 shadow-xs select-none">
+    <header className="no-print app-surface h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-40 shadow-xs select-none">
       <div className="w-full flex items-center justify-between gap-4">
         
         {/* Right side: App Title & Toggle & Organization Logo */}

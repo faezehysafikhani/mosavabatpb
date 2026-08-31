@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { UserPlus, Pencil, ShieldCheck, Trash2, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { mockDepartments } from '../../mock/data';
 import { User, UserRole } from '../../types';
 import { CreateUserModal } from '../users/CreateUserModal';
 import { PermissionsModal } from './PermissionsModal';
@@ -30,12 +29,6 @@ export const UsersTable: React.FC = () => {
     return !term || u.fullName.toLowerCase().includes(term) || u.title.toLowerCase().includes(term) || u.departmentName.toLowerCase().includes(term);
   });
 
-  const getDirectManager = (user: User): string => {
-    const dept = mockDepartments.find((d) => d.id === user.departmentId);
-    if (!dept || dept.managerId === user.id) return '—';
-    return dept.managerName;
-  };
-
   return (
     <div className="bg-white rounded-2xl shadow-xs border border-slate-100">
       <div className="p-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100">
@@ -62,12 +55,8 @@ export const UsersTable: React.FC = () => {
           <thead>
             <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 text-[11px]">
               <th className="py-2.5 px-3 font-semibold">کاربر</th>
-              <th className="py-2.5 px-3 font-semibold">موبایل</th>
-              <th className="py-2.5 px-3 font-semibold">ایمیل</th>
               <th className="py-2.5 px-3 font-semibold">دپارتمان</th>
               <th className="py-2.5 px-3 font-semibold">سمت</th>
-              <th className="py-2.5 px-3 font-semibold">مدیر مستقیم</th>
-              <th className="py-2.5 px-3 font-semibold">دسترسی‌ها</th>
               <th className="py-2.5 px-3 font-semibold">وضعیت</th>
               <th className="py-2.5 px-3 font-semibold">عملیات</th>
             </tr>
@@ -76,12 +65,8 @@ export const UsersTable: React.FC = () => {
             {filteredUsers.map((user) => (
               <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
                 <td className="py-3 px-3 font-bold text-slate-800">{user.fullName}</td>
-                <td className="py-3 px-3 text-slate-600" dir="ltr">{user.phone}</td>
-                <td className="py-3 px-3 text-slate-600" dir="ltr">{user.email}</td>
                 <td className="py-3 px-3 text-slate-600">{user.departmentName}</td>
                 <td className="py-3 px-3 text-slate-600">{user.title}</td>
-                <td className="py-3 px-3 text-slate-600">{getDirectManager(user)}</td>
-                <td className="py-3 px-3 text-slate-600">{ROLE_LABELS[user.role]} ({user.permissions.length})</td>
                 <td className="py-3 px-3">
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${user.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
                     {user.isActive ? 'فعال' : 'غیرفعال'}
