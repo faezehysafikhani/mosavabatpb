@@ -12,6 +12,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
   const { currentUser, availableUsers, showToast, triggerRefresh } = useApp();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [rationale, setRationale] = useState('');
   const [presenterUserId, setPresenterUserId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,6 +30,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
       await proposalService.createProposal({
         title: title.trim(),
         description: description.trim(),
+        rationale: rationale.trim(),
         proposerName: currentUser.fullName,
         proposerUserId: currentUser.id,
         proposerDepartmentId: currentUser.departmentId,
@@ -43,6 +45,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
       );
       setTitle('');
       setDescription('');
+      setRationale('');
       setPresenterUserId('');
       triggerRefresh();
       onClose();
@@ -98,6 +101,10 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
               className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
               placeholder="این موضوع چرا باید در جلسه مطرح و درباره آن تصمیم‌گیری شود؟"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">دلایل و ضرورت طرح</label>
+            <textarea rows={2} value={rationale} onChange={(e) => setRationale(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" placeholder="دلایل اداری، مالی یا راهبردی طرح موضوع در هیأت‌مدیره" />
           </div>
           <div className="flex items-center justify-end gap-2.5 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer">

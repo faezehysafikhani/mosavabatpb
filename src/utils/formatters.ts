@@ -70,6 +70,16 @@ export function getMeetingTypeLabel(type: MeetingType): string {
  */
 export function getMeetingStatusMeta(status: MeetingStatus): { label: string; bg: string; text: string; dot: string } {
   switch (status) {
+    case 'AGENDA_PREPARATION':
+      return { label: 'در حال تهیه دستورکار', bg: 'bg-slate-50 text-slate-700 border-slate-200', text: 'text-slate-700', dot: 'bg-slate-500' };
+    case 'WAITING_FOR_CEO_APPROVAL':
+      return { label: 'در انتظار تأیید دستورکار مدیرعامل', bg: 'bg-amber-50 text-amber-700 border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500' };
+    case 'AGENDA_RETURNED':
+      return { label: 'دستورکار برگشتی به دبیرخانه', bg: 'bg-rose-50 text-rose-700 border-rose-200', text: 'text-rose-700', dot: 'bg-rose-500' };
+    case 'READY_FOR_INVITATION':
+      return { label: 'آماده ارسال دعوتنامه', bg: 'bg-violet-50 text-violet-700 border-violet-200', text: 'text-violet-700', dot: 'bg-violet-500' };
+    case 'INVITATION_SENT':
+      return { label: 'دعوتنامه ارسال شده', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200', text: 'text-cyan-700', dot: 'bg-cyan-500' };
     case 'HELD':
       return { label: 'برگزار شده و نهایی', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' };
     case 'IN_PROGRESS':

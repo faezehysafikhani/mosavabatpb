@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { meetingService, resolutionService } from '../../services';
-import { Meeting, Resolution } from '../../types';
+import { Meeting, Resolution, AgendaItem } from '../../types';
 import {
   Calendar,
   Clock,
@@ -20,7 +20,12 @@ import {
   ChevronLeft,
   FileCheck2,
   ExternalLink,
-  FileDown
+  FileDown,
+  Send,
+  ArrowUp,
+  ArrowDown,
+  RotateCcw,
+  Mail
 } from 'lucide-react';
 import { toPersianDigits, getMeetingTypeLabel, getMeetingStatusMeta, getResolutionExecutionMeta, getPriorityMeta } from '../../utils/formatters';
 import { AttachmentList } from '../../components/common/AttachmentList';
@@ -33,12 +38,21 @@ interface MeetingDetailViewProps {
 }
 
 export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId }) => {
-  const { navigateTo, showToast, refreshTrigger, openCreateResolutionModal, hasPermission } = useApp();
+  const { currentUser, navigateTo, showToast, refreshTrigger, triggerRefresh, openCreateResolutionModal, hasPermission } = useApp();
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [resolutions, setResolutions] = useState<Resolution[]>([]);
-  const [activeTab, setActiveTab] = useState<'AGENDAS' | 'RESOLUTIONS' | 'MEMBERS' | 'ATTACHMENTS' | 'MINUTES_PRINT'>('AGENDAS');
+  const [activeTab, setActiveTab] = useState<'AGENDAS' | 'RESOLUTIONS' | 'MEMBERS' | 'INVITATIONS' | 'ATTACHMENTS' | 'MINUTES_PRINT'>('AGENDAS');
   const [loading, setLoading] = useState(true);
+  const [agendaReviewNotes, setAgendaReviewNotes] = useState('');
+  const [outcomeStatuses, setOutcomeStatuses] = useState<Record<string, NonNullable<AgendaItem['outcomeStatus']>>>({});
+  const [outcomeNotes, setOutcomeNotes] = useState<Record<string, string>>({});
+  const [guestName, setGuestName] = useState('');
+  const [guestTitle, setGuestTitle] = useState('');
+  const [guestOrganization, setGuestOrganization] = useState('');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestAgendaId, setGuestAgendaId] = useState('');
+  const [guestTime, setGuestTime] = useState('');
   const printableRef = useRef<HTMLDivElement>(null);
   const canCreateResolution = hasPermission('CREATE_RESOLUTION');
 
@@ -85,6 +99,58 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
     });
   };
 
+  const handleAgendaReview = async (decision: 'APPROVE' | 'RETURN') => {
+    try {
+      await meetingService.reviewAgenda(meetingId, decision, agendaReviewNotes, currentUser);
+      showToast('بررسی دستورکار', decision === 'APPROVE' ? 'دستورکار تأیید و آماده ارسال دعوتنامه شد.' : 'دستورکار برای اصلاح به دبیرخانه بازگشت.', 'success');
+      triggerRefresh();
+    } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'عملیات انجام نشد.', 'error'); }
+  };
+
+  const handleMoveAgenda = async (index: number, direction: -1 | 1) => {
+    if (!meeting) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= meeting.agendaItems.length) return;
+    const ids = meeting.agendaItems.map((item) => item.id);
+    [ids[index], ids[nextIndex]] = [ids[nextIndex], ids[index]];
+    try { await meetingService.reorderAgenda(meeting.id, ids, currentUser); triggerRefresh(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ترتیب ذخیره نشد.', 'error'); }
+  };
+
+  const handleRemoveAgendaByCeo = async (agenda: AgendaItem) => {
+    const reason = window.prompt('دلیل حذف این موضوع از جلسه را وارد کنید:');
+    if (!reason) return;
+    try { await meetingService.removeAgendaItem(meetingId, agenda.id, reason, currentUser); showToast('اصلاح دستورکار', 'موضوع از دستورکار جاری خارج و سابقه آن حفظ شد.', 'success'); triggerRefresh(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'موضوع حذف نشد.', 'error'); }
+  };
+
+  const handleRecordOutcome = async (agenda: AgendaItem) => {
+    try {
+      await meetingService.recordAgendaOutcome(meetingId, agenda.id, outcomeStatuses[agenda.id] || 'APPROVED', outcomeNotes[agenda.id] || '', currentUser);
+      showToast('نتیجه جلسه', 'نتیجه این بند ثبت و در سوابق جلسه نگهداری شد.', 'success');
+      triggerRefresh();
+    } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'نتیجه ثبت نشد.', 'error'); }
+  };
+
+  const handleAddGuest = async () => {
+    const agenda = meeting?.agendaItems.find((item) => item.id === guestAgendaId);
+    try {
+      await meetingService.addGuest(meetingId, { fullName: guestName, roleTitle: guestTitle, organizationName: guestOrganization, phone: guestPhone, agendaItemId: agenda?.id, agendaItemTitle: agenda?.title, requiredTime: guestTime }, currentUser);
+      setGuestName(''); setGuestTitle(''); setGuestOrganization(''); setGuestPhone(''); setGuestAgendaId(''); setGuestTime('');
+      showToast('ثبت مدعو', 'مدعو مستقل به جلسه افزوده شد.', 'success'); triggerRefresh();
+    } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'مدعو ثبت نشد.', 'error'); }
+  };
+
+  const handleSendInvitations = async () => {
+    try { await meetingService.sendInvitations(meetingId, currentUser); showToast('ارسال دعوتنامه', 'دعوتنامه اعضا و مدعوین ارسال و در تاریخچه ثبت شد.', 'success'); triggerRefresh(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ارسال انجام نشد.', 'error'); }
+  };
+
+  const handleInvitationViewed = async () => {
+    try { await meetingService.markInvitationViewed(meetingId, currentUser.id, currentUser); showToast('دعوتنامه', 'مشاهده دعوتنامه ثبت شد.', 'success'); triggerRefresh(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ثبت مشاهده انجام نشد.', 'error'); }
+  };
+
   if (loading || !meeting) {
     return (
       <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
@@ -95,6 +161,9 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
   }
 
   const statusMeta = getMeetingStatusMeta(meeting.status);
+  const isCeo = currentUser.role === 'CEO' || currentUser.role === 'ADMIN';
+  const isSecretariat = currentUser.id === meeting.secretaryId || currentUser.role === 'SECRETARY' || currentUser.role === 'ADMIN';
+  const canArrangeAgenda = (isCeo || isSecretariat) && ['WAITING_FOR_CEO_APPROVAL', 'AGENDA_RETURNED'].includes(meeting.status);
 
   return (
     <div className="space-y-5 pb-16">
@@ -108,8 +177,10 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
           <span>بازگشت به لیست جلسات</span>
         </button>
 
-        {canCreateResolution && (
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isSecretariat && meeting.status === 'AGENDA_RETURNED' && <button onClick={async () => { await meetingService.submitAgenda(meeting.id, currentUser); triggerRefresh(); }} className="flex items-center gap-1.5 bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded-xl"><RotateCcw className="w-4 h-4" />ارسال مجدد دستورکار</button>}
+          {isSecretariat && meeting.status === 'READY_FOR_INVITATION' && <button onClick={handleSendInvitations} className="flex items-center gap-1.5 bg-violet-700 text-white font-bold text-xs py-2 px-4 rounded-xl"><Send className="w-4 h-4" />ارسال دعوتنامه‌ها</button>}
+          {canCreateResolution && ['IN_PROGRESS', 'HELD'].includes(meeting.status) && (
             <button
               onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}
               className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
@@ -117,9 +188,11 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
               <Plus className="w-4 h-4" />
               <span>ثبت مصوبه جدید برای این جلسه</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
+      {isCeo && meeting.status === 'WAITING_FOR_CEO_APPROVAL' && <div className="no-print bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3"><div className="font-extrabold text-amber-900">بررسی و تأیید دستورکار توسط مدیرعامل</div><textarea rows={2} value={agendaReviewNotes} onChange={(e) => setAgendaReviewNotes(e.target.value)} placeholder="توضیحات تأیید یا دلیل بازگشت" className="w-full text-xs p-3 bg-white border border-amber-200 rounded-xl" /><div className="flex gap-2"><button onClick={() => handleAgendaReview('APPROVE')} className="bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold">تأیید نهایی دستورکار</button><button onClick={() => handleAgendaReview('RETURN')} className="bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold">بازگشت به دبیرخانه</button></div></div>}
 
       {/* Main Meeting Banner Header */}
       <div className="no-print bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-4">
@@ -241,6 +314,14 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
         </button>
 
         <button
+          onClick={() => setActiveTab('INVITATIONS')}
+          className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${activeTab === 'INVITATIONS' ? 'bg-teal-800 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'}`}
+        >
+          <Mail className="w-4 h-4" />
+          <span>دعوتنامه‌ها و مدعوین ({toPersianDigits((meeting.invitations?.length || 0) + (meeting.guests?.length || 0))})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('MINUTES_PRINT')}
           className={`flex items-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
             activeTab === 'MINUTES_PRINT'
@@ -272,7 +353,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
           </div>
 
           <div className="space-y-4">
-            {meeting.agendaItems.map((ag) => {
+            {meeting.agendaItems.map((ag, agendaIndex) => {
               const relatedResolutions = resolutions.filter(
                 (r) => r.agendaItemId === ag.id || r.topicTitle.toLowerCase().includes(ag.title.toLowerCase())
               );
@@ -280,7 +361,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
               return (
                 <div
                   key={ag.id}
-                  className="p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3 hover:border-teal-300 transition-all"
+                  className={`p-5 rounded-2xl border space-y-3 transition-all ${ag.isRemoved ? 'bg-rose-50/50 border-rose-200 opacity-75' : 'bg-slate-50/90 border-slate-200/90 hover:border-teal-300'}`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -302,7 +383,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                     </div>
 
                     {/* Prominent Button: ثبت مصوبه برای این بند (Requirement 9) */}
-                    {canCreateResolution && (
+                    {canCreateResolution && !ag.isRemoved && ['APPROVED', 'CONDITIONAL'].includes(ag.outcomeStatus || '') && (
                       <button
                         onClick={() => handleRegisterResolutionForAgenda(ag.id, ag.title)}
                         className="flex items-center gap-1.5 bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition-all cursor-pointer"
@@ -311,12 +392,26 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                         <span>ثبت مصوبه برای این بند</span>
                       </button>
                     )}
+                    {canArrangeAgenda && <div className="flex gap-1"><button onClick={() => handleMoveAgenda(agendaIndex, -1)} disabled={agendaIndex === 0} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30" title="انتقال به بالا"><ArrowUp className="w-4 h-4" /></button><button onClick={() => handleMoveAgenda(agendaIndex, 1)} disabled={agendaIndex === meeting.agendaItems.length - 1} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-30" title="انتقال به پایین"><ArrowDown className="w-4 h-4" /></button></div>}
+                    {isCeo && meeting.status === 'WAITING_FOR_CEO_APPROVAL' && !ag.isRemoved && <button onClick={() => handleRemoveAgendaByCeo(ag)} className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold">حذف از این جلسه</button>}
                   </div>
+
+                  {ag.isRemoved && <div className="p-2.5 bg-white border border-rose-200 rounded-xl text-rose-700 text-[11px] font-bold">خارج‌شده از دستورکار جاری — دلیل: {ag.removalReason}</div>}
 
                   {ag.outcomeNotes && (
                     <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 leading-relaxed">
                       <span className="font-bold text-teal-900 block mb-1">شرح مذاکرات و نتایج بررسی:</span>
                       {ag.outcomeNotes}
+                    </div>
+                  )}
+
+                  {isSecretariat && !ag.isRemoved && ['INVITATION_SENT', 'SCHEDULED', 'IN_PROGRESS', 'HELD'].includes(meeting.status) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 bg-white rounded-xl border border-slate-200">
+                      <select value={outcomeStatuses[ag.id] || ag.outcomeStatus || 'APPROVED'} onChange={(e) => setOutcomeStatuses((prev) => ({ ...prev, [ag.id]: e.target.value as NonNullable<AgendaItem['outcomeStatus']> }))} className="sm:col-span-3 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                        <option value="APPROVED">تصویب شد</option><option value="NOT_APPROVED">تصویب نشد</option><option value="NEEDS_REVISION">نیاز به اصلاح</option><option value="NEEDS_MORE_REVIEW">نیاز به بررسی بیشتر</option><option value="DEFERRED">موکول به جلسه بعد</option><option value="REFERRED">ارجاع به واحد مربوطه</option><option value="CONDITIONAL">تصویب مشروط</option><option value="CLOSED">مختومه</option>
+                      </select>
+                      <input value={outcomeNotes[ag.id] ?? ag.outcomeNotes ?? ''} onChange={(e) => setOutcomeNotes((prev) => ({ ...prev, [ag.id]: e.target.value }))} placeholder="شرح مذاکرات و نتیجه نهایی این بند" className="sm:col-span-7 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl" />
+                      <button onClick={() => handleRecordOutcome(ag)} className="sm:col-span-2 bg-teal-800 text-white rounded-xl text-xs font-bold">ثبت نتیجه</button>
                     </div>
                   )}
 
@@ -459,6 +554,40 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'INVITATIONS' && (
+        <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div><h3 className="text-xs font-extrabold text-slate-800">دعوتنامه اعضا و مدعوین مستقل</h3><p className="text-[11px] text-slate-500 mt-1">ارسال دعوتنامه فقط پس از تأیید نهایی دستورکار فعال می‌شود.</p></div>
+            {isSecretariat && meeting.status === 'READY_FOR_INVITATION' && <button onClick={handleSendInvitations} className="bg-violet-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"><Send className="w-4 h-4" />ارسال همه دعوتنامه‌ها</button>}
+          </div>
+
+          {isSecretariat && !['INVITATION_SENT', 'IN_PROGRESS', 'HELD'].includes(meeting.status) && (
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <div className="font-bold text-slate-800">ثبت مدعو خارج از اعضای اصلی</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="نام و نام خانوادگی *" className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl" />
+                <input value={guestTitle} onChange={(e) => setGuestTitle(e.target.value)} placeholder="سمت *" className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl" />
+                <input value={guestOrganization} onChange={(e) => setGuestOrganization(e.target.value)} placeholder="سازمان / واحد *" className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl" />
+                <input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="شماره تماس *" className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl" />
+                <select value={guestAgendaId} onChange={(e) => setGuestAgendaId(e.target.value)} className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl"><option value="">موضوع مرتبط...</option>{meeting.agendaItems.filter((item) => !item.isRemoved).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>
+                <input value={guestTime} onChange={(e) => setGuestTime(e.target.value)} placeholder="زمان حضور، مثال ۱۰:۳۰" className="text-xs p-2.5 bg-white border border-slate-200 rounded-xl" />
+              </div>
+              <button onClick={handleAddGuest} className="bg-teal-800 text-white px-4 py-2 rounded-xl text-xs font-bold">افزودن مدعو</button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {meeting.members.map((member) => {
+              const invitation = meeting.invitations?.find((item) => item.recipientType === 'MEMBER' && item.recipientId === member.userId);
+              return <div key={member.userId} className="p-3 border border-slate-200 rounded-2xl"><strong className="text-slate-800">{member.fullName}</strong><span className="block text-[10px] text-slate-500">{member.roleTitle} — عضو جلسه</span><span className={`inline-block mt-2 text-[10px] font-bold px-2 py-1 rounded-full ${invitation ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{invitation?.status === 'VIEWED' ? 'مشاهده شده' : invitation ? 'ارسال شده' : 'ارسال نشده'}</span>{invitation && <span className="text-[10px] text-slate-400 mr-2">{toPersianDigits(new Date(invitation.sentAt).toLocaleString('fa-IR'))}</span>}{member.userId === currentUser.id && invitation?.status === 'SENT' && <button onClick={handleInvitationViewed} className="block mt-2 bg-teal-800 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold">ثبت مشاهده دعوتنامه</button>}</div>;
+            })}
+            {(meeting.guests || []).map((guest) => <div key={guest.id} className="p-3 border border-blue-200 bg-blue-50/30 rounded-2xl"><strong className="text-slate-800">{guest.fullName}</strong><span className="block text-[10px] text-slate-500">{guest.roleTitle} — {guest.organizationName}</span><span className="block text-[10px] text-blue-700 mt-1">موضوع: {guest.agendaItemTitle || 'کل جلسه'} | زمان حضور: {toPersianDigits(guest.requiredTime || '—')}</span><span className="inline-block mt-2 text-[10px] font-bold px-2 py-1 rounded-full bg-white border border-blue-200">{guest.invitationStatus === 'SENT' ? 'دعوتنامه ارسال شده' : guest.invitationStatus === 'VIEWED' ? 'مشاهده شده' : 'ارسال نشده'}</span></div>)}
+          </div>
+
+          {(meeting.history?.length || 0) > 0 && <details className="text-[11px] text-slate-600"><summary className="cursor-pointer font-bold">تاریخچه اداری جلسه و دعوتنامه‌ها</summary><div className="mt-2 space-y-1">{meeting.history?.map((entry) => <div key={entry.id} className="p-2 bg-slate-50 rounded-lg">{entry.action} — {entry.actorName} — {toPersianDigits(entry.dateJalali)} {toPersianDigits(entry.timeString)}{entry.notes ? ` — ${entry.notes}` : ''}</div>)}</div></details>}
         </div>
       )}
 

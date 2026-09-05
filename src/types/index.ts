@@ -116,11 +116,38 @@ export type ProposalStatus =
   | 'PENDING_CEO_REVIEW'     // در انتظار بررسی مدیرعامل
   | 'REJECTED'               // رد شده (فقط قابل بازیافت)
   | 'APPROVED'               // تایید شده توسط مدیرعامل، در انتظار تبدیل به تایید جلسه توسط مسئول دفتر
+  | 'RETURNED_FOR_REVISION'  // برگشت به پیشنهاددهنده برای اصلاح
+  | 'RESUBMITTED'            // اصلاح و مجدداً برای مدیرعامل ارسال شده
+  | 'NO_BOARD_REQUIRED'      // عدم نیاز به طرح در هیأت‌مدیره
+  | 'CEO_ORDER_ISSUED'       // تبدیل به دستور مستقیم مدیرعامل
+  | 'CLOSED'                 // مختومه / بایگانی شده
   | 'CONFIRMED_FOR_MEETING'  // تایید جلسه شده (ارائه‌دهنده مشخص شد)، آماده افزودن به یک جلسه
   | 'CONVERTED_TO_AGENDA';   // تبدیل شده به بند دستور یک جلسه مشخص
 
+export interface WorkflowHistoryEntry {
+  id: string;
+  action: string;
+  actorUserId: string;
+  actorName: string;
+  actorRole: string;
+  fromStatus?: string;
+  toStatus: string;
+  dateJalali: string;
+  timeString: string;
+  notes?: string;
+}
+
+export interface CeoDirectOrder {
+  text: string;
+  assigneeUserId: string;
+  assigneeName: string;
+  deadlineJalali: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+}
+
 export interface Proposal {
   id: string;
+  proposalNumber?: string;
   title: string;
   proposerName: string;
   proposerUserId?: string;
@@ -129,6 +156,7 @@ export interface Proposal {
   presenterUserId?: string;
   presenterName: string;
   description: string;
+  rationale?: string;
   notes?: string;
   dateJalali: string;
   attachments: Attachment[];
@@ -141,11 +169,19 @@ export interface Proposal {
   relatedUsers?: RelatedUserRef[];
   assignedMeetingId?: string;
   assignedMeetingTitle?: string;
+  ceoOrder?: CeoDirectOrder;
+  history?: WorkflowHistoryEntry[];
+  updatedAt?: string;
   createdAt: string;
 }
 
 export type MeetingStatus =
   | 'DRAFT'           // پیش‌نویس
+  | 'AGENDA_PREPARATION'
+  | 'WAITING_FOR_CEO_APPROVAL'
+  | 'AGENDA_RETURNED'
+  | 'READY_FOR_INVITATION'
+  | 'INVITATION_SENT'
   | 'SCHEDULED'       // برنامه‌ریزی شده
   | 'IN_PROGRESS'     // در حال برگزاری
   | 'HELD'            // برگزار شده و نهایی
@@ -183,6 +219,35 @@ export interface AgendaItem {
   isDiscussed: boolean;
   sourceProposalId?: string;
   relatedUsers?: RelatedUserRef[];
+  outcomeStatus?: 'APPROVED' | 'NOT_APPROVED' | 'NEEDS_REVISION' | 'NEEDS_MORE_REVIEW' | 'DEFERRED' | 'REFERRED' | 'CONDITIONAL' | 'CLOSED';
+  outcomeNotes?: string;
+  isRemoved?: boolean;
+  removalReason?: string;
+}
+
+export interface MeetingGuest {
+  id: string;
+  fullName: string;
+  roleTitle: string;
+  organizationName: string;
+  phone: string;
+  agendaItemId?: string;
+  agendaItemTitle?: string;
+  requiredTime?: string;
+  invitationStatus: 'NOT_SENT' | 'SENT' | 'VIEWED';
+  sentAt?: string;
+}
+
+export interface MeetingInvitation {
+  id: string;
+  recipientType: 'MEMBER' | 'GUEST';
+  recipientId: string;
+  recipientName: string;
+  recipientPhone?: string;
+  status: 'SENT' | 'VIEWED';
+  sentAt: string;
+  viewedAt?: string;
+  attachmentIds: string[];
 }
 
 export interface RelatedUserRef {
@@ -221,6 +286,10 @@ export interface Meeting {
   minutesSummary?: string;     // صورتجلسه خلاصه
   members: MeetingMember[];
   agendaItems: AgendaItem[];
+  guests?: MeetingGuest[];
+  invitations?: MeetingInvitation[];
+  agendaApprovalNotes?: string;
+  history?: WorkflowHistoryEntry[];
   resolutionsCount: number;
   attachments: Attachment[];
   createdAt: string;

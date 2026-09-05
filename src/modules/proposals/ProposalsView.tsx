@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X
+  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { proposalService } from '../../services/proposalService';
@@ -15,6 +15,11 @@ const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
   PENDING_OFFICE_REVIEW: { label: 'در انتظار بررسی مسئول دفتر', bg: 'bg-sky-50 text-sky-700 border-sky-200' },
   PENDING_CEO_REVIEW: { label: 'در انتظار بررسی مدیرعامل', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
   REJECTED: { label: 'رد شده', bg: 'bg-rose-50 text-rose-700 border-rose-200' },
+  RETURNED_FOR_REVISION: { label: 'برگشت جهت اصلاح', bg: 'bg-orange-50 text-orange-700 border-orange-200' },
+  RESUBMITTED: { label: 'اصلاح و ارسال مجدد', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
+  NO_BOARD_REQUIRED: { label: 'عدم نیاز به طرح در هیأت‌مدیره', bg: 'bg-slate-50 text-slate-700 border-slate-200' },
+  CEO_ORDER_ISSUED: { label: 'دستور مدیرعامل صادر شد', bg: 'bg-purple-50 text-purple-700 border-purple-200' },
+  CLOSED: { label: 'مختومه / بایگانی', bg: 'bg-slate-100 text-slate-600 border-slate-300' },
   APPROVED: { label: 'تایید جلسات تایید نشده', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
   CONFIRMED_FOR_MEETING: { label: 'تایید جلسه شده', bg: 'bg-violet-50 text-violet-700 border-violet-200' },
   CONVERTED_TO_AGENDA: { label: 'تبدیل شده به بند دستور جلسه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -31,7 +36,7 @@ const OFFICE_FILTERS: { id: OfficeStatusFilter; label: string }[] = [
 ];
 
 export const ProposalsView: React.FC = () => {
-  const { currentUser, showToast, refreshTrigger, triggerRefresh } = useApp();
+  const { currentUser, availableUsers, showToast, refreshTrigger, triggerRefresh } = useApp();
 
   const isOfficeManager = currentUser.role === 'ADMIN' || currentUser.role === 'SECRETARY';
   const isCeo = currentUser.role === 'ADMIN' || currentUser.role === 'CEO';
@@ -42,6 +47,11 @@ export const ProposalsView: React.FC = () => {
   const [officeFilter, setOfficeFilter] = useState<OfficeStatusFilter>('APPROVED');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
+  const [orderAssignees, setOrderAssignees] = useState<Record<string, string>>({});
+  const [orderDeadlines, setOrderDeadlines] = useState<Record<string, string>>({});
+  const [revisionTitles, setRevisionTitles] = useState<Record<string, string>>({});
+  const [revisionDescriptions, setRevisionDescriptions] = useState<Record<string, string>>({});
+  const [revisionRationales, setRevisionRationales] = useState<Record<string, string>>({});
   const [confirmingProposal, setConfirmingProposal] = useState<Proposal | null>(null);
 
   useEffect(() => {
@@ -54,7 +64,7 @@ export const ProposalsView: React.FC = () => {
   };
 
   const handleReview = async (proposal: Proposal, decision: 'APPROVED' | 'REJECTED') => {
-    await proposalService.reviewProposal(proposal.id, decision, decisionNotes[proposal.id]);
+    await proposalService.reviewProposal(proposal.id, decision, decisionNotes[proposal.id], currentUser);
     showToast(
       decision === 'APPROVED' ? 'تایید مصوبه پیشنهادی' : 'رد مصوبه پیشنهادی',
       decision === 'APPROVED'
@@ -70,6 +80,49 @@ export const ProposalsView: React.FC = () => {
     setConfirmingProposal(proposal);
   };
 
+  const handleCeoAlternative = async (proposal: Proposal, decision: 'RETURN' | 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED' | 'CLOSED') => {
+    try {
+      const notes = decisionNotes[proposal.id] || '';
+      if (decision === 'RETURN') {
+        await proposalService.returnForRevision(proposal.id, notes, currentUser);
+      } else if (decision === 'CEO_ORDER_ISSUED') {
+        const assignee = availableUsers.find((user) => user.id === orderAssignees[proposal.id]);
+        await proposalService.decideWithoutBoard(proposal.id, decision, notes, currentUser, {
+          text: notes,
+          assigneeUserId: assignee?.id || '',
+          assigneeName: assignee?.fullName || '',
+          deadlineJalali: orderDeadlines[proposal.id] || '',
+          status: 'PENDING',
+        });
+      } else {
+        await proposalService.decideWithoutBoard(proposal.id, decision, notes, currentUser);
+      }
+      showToast('ثبت تصمیم مدیرعامل', 'تصمیم ثبت و در سابقه پیشنهاد نگهداری شد.', 'success');
+      triggerRefresh();
+    } catch (error) {
+      showToast('خطا', error instanceof Error ? error.message : 'ثبت تصمیم انجام نشد.', 'error');
+    }
+  };
+
+  const handleResubmit = async (proposal: Proposal) => {
+    try {
+      await proposalService.resubmitProposal(proposal.id, {
+        title: revisionTitles[proposal.id] ?? proposal.title,
+        description: revisionDescriptions[proposal.id] ?? proposal.description,
+        rationale: revisionRationales[proposal.id] ?? proposal.rationale,
+      }, currentUser);
+      showToast('ارسال مجدد', 'پیشنهاد اصلاح‌شده به کارتابل مدیرعامل ارسال شد.', 'success');
+      triggerRefresh();
+    } catch (error) {
+      showToast('خطا', error instanceof Error ? error.message : 'ارسال مجدد انجام نشد.', 'error');
+    }
+  };
+
+  const handleOrderStatus = async (proposal: Proposal, status: 'IN_PROGRESS' | 'COMPLETED') => {
+    try { await proposalService.updateCeoOrderStatus(proposal.id, status, currentUser); showToast('پیگیری دستور', 'وضعیت اجرای دستور مدیرعامل ثبت شد.', 'success'); triggerRefresh(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'وضعیت ثبت نشد.', 'error'); }
+  };
+
   const handleConfirmForMeeting = async () => {
     if (!confirmingProposal) return;
     await proposalService.confirmForMeeting(confirmingProposal.id);
@@ -78,15 +131,15 @@ export const ProposalsView: React.FC = () => {
     triggerRefresh();
   };
 
-  const ceoQueue = proposals.filter((p) => p.status === 'PENDING_CEO_REVIEW');
-  const officeEligibleStatuses: ProposalStatus[] = ['APPROVED', 'CONFIRMED_FOR_MEETING', 'CONVERTED_TO_AGENDA'];
+  const ceoQueue = proposals.filter((p) => ['PENDING_CEO_REVIEW', 'RESUBMITTED'].includes(p.status));
+  const officeEligibleStatuses: ProposalStatus[] = ['APPROVED', 'CONFIRMED_FOR_MEETING', 'CONVERTED_TO_AGENDA', 'RETURNED_FOR_REVISION', 'RESUBMITTED', 'NO_BOARD_REQUIRED', 'CEO_ORDER_ISSUED', 'CLOSED', 'REJECTED'];
   const officeItems = proposals.filter((p) => officeEligibleStatuses.includes(p.status) && (officeFilter === 'ALL' || p.status === officeFilter));
-  const myProposals = proposals.filter((p) => p.proposerUserId === currentUser.id);
+  const myProposals = proposals.filter((p) => p.proposerUserId === currentUser.id || p.ceoOrder?.assigneeUserId === currentUser.id);
 
   const visibleTabs: { id: ProposalTab; label: string; count: number; icon: React.ElementType }[] = [
     ...(isOfficeManager ? [{ id: 'OFFICE' as ProposalTab, label: 'مسئول دفتر', count: proposals.filter((p) => p.status === 'APPROVED').length, icon: Lightbulb }] : []),
     ...(isCeo ? [{ id: 'CEO' as ProposalTab, label: 'کارتابل مدیرعامل', count: ceoQueue.length, icon: Inbox }] : []),
-    ...(isRegularUser ? [{ id: 'MINE' as ProposalTab, label: 'مصوبات پیشنهادی من', count: myProposals.length, icon: Lightbulb }] : []),
+    ...(isRegularUser ? [{ id: 'MINE' as ProposalTab, label: 'پیشنهادها و دستورات من', count: myProposals.length, icon: Lightbulb }] : []),
   ];
 
   return (
@@ -193,7 +246,9 @@ export const ProposalsView: React.FC = () => {
           ) : ceoQueue.map((p) => (
             <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2.5">
               <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
+              <div className="text-[10px] font-bold text-teal-700">{p.proposalNumber}</div>
               <p className="text-xs text-slate-600">{p.description}</p>
+              {p.rationale && <p className="text-[11px] text-slate-500"><strong>ضرورت طرح:</strong> {p.rationale}</p>}
               <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-500">
                 <span>پیشنهاددهنده: {p.proposerName} — {p.proposerDepartmentName}</span>
                 <span>ارائه‌دهنده: {p.presenterName || '—'}</span>
@@ -203,10 +258,17 @@ export const ProposalsView: React.FC = () => {
                 type="text"
                 value={decisionNotes[p.id] || ''}
                 onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                placeholder="یادداشت تصمیم (اختیاری)"
+                placeholder="توضیحات تصمیم / دلیل برگشت / متن دستور مدیرعامل"
                 className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
               />
-              <div className="flex items-center gap-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <select value={orderAssignees[p.id] || ''} onChange={(e) => setOrderAssignees((prev) => ({ ...prev, [p.id]: e.target.value }))} className="text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                  <option value="">مسئول دستور مدیرعامل...</option>
+                  {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} — {user.title}</option>)}
+                </select>
+                <input value={orderDeadlines[p.id] || ''} onChange={(e) => setOrderDeadlines((prev) => ({ ...prev, [p.id]: e.target.value }))} placeholder="مهلت دستور، مثال ۱۴۰۵/۰۷/۳۰" className="text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl" />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button onClick={() => handleReview(p, 'APPROVED')} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>تایید</span>
@@ -215,6 +277,10 @@ export const ProposalsView: React.FC = () => {
                   <XCircle className="w-3.5 h-3.5" />
                   <span>رد</span>
                 </button>
+                <button onClick={() => handleCeoAlternative(p, 'RETURN')} className="flex items-center gap-1.5 bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold py-2 px-3 rounded-xl"><RotateCcw className="w-3.5 h-3.5" />برگشت جهت اصلاح</button>
+                <button onClick={() => handleCeoAlternative(p, 'NO_BOARD_REQUIRED')} className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl">عدم نیاز به طرح</button>
+                <button onClick={() => handleCeoAlternative(p, 'CEO_ORDER_ISSUED')} className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold py-2 px-3 rounded-xl"><ClipboardCheck className="w-3.5 h-3.5" />صدور دستور</button>
+                <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl"><Archive className="w-3.5 h-3.5" />بایگانی</button>
               </div>
             </div>
           ))}
@@ -248,6 +314,16 @@ export const ProposalsView: React.FC = () => {
               {p.managementDecisionNotes && (
                 <p className="text-[11px] text-slate-500">یادداشت تصمیم: {p.managementDecisionNotes}</p>
               )}
+              {p.ceoOrder && <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl text-[11px] space-y-1"><div className="font-extrabold text-purple-900">دستور مستقیم مدیرعامل</div><div>{p.ceoOrder.text}</div><div>مسئول: {p.ceoOrder.assigneeName} — مهلت: {toPersianDigits(p.ceoOrder.deadlineJalali)} — وضعیت: {p.ceoOrder.status === 'PENDING' ? 'در انتظار اقدام' : p.ceoOrder.status === 'IN_PROGRESS' ? 'در حال اقدام' : 'انجام‌شده'}</div>{p.ceoOrder.assigneeUserId === currentUser.id && p.ceoOrder.status !== 'COMPLETED' && <div className="flex gap-2 pt-1">{p.ceoOrder.status === 'PENDING' && <button onClick={() => handleOrderStatus(p, 'IN_PROGRESS')} className="bg-purple-700 text-white px-3 py-1.5 rounded-lg font-bold">شروع اقدام</button>}<button onClick={() => handleOrderStatus(p, 'COMPLETED')} className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">اعلام انجام</button></div>}</div>}
+              {p.status === 'RETURNED_FOR_REVISION' && (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-2xl space-y-2">
+                  <input value={revisionTitles[p.id] ?? p.title} onChange={(e) => setRevisionTitles((prev) => ({ ...prev, [p.id]: e.target.value }))} className="w-full text-xs p-2.5 bg-white border border-orange-200 rounded-xl" />
+                  <textarea rows={3} value={revisionDescriptions[p.id] ?? p.description} onChange={(e) => setRevisionDescriptions((prev) => ({ ...prev, [p.id]: e.target.value }))} className="w-full text-xs p-2.5 bg-white border border-orange-200 rounded-xl" />
+                  <textarea rows={2} value={revisionRationales[p.id] ?? p.rationale ?? ''} onChange={(e) => setRevisionRationales((prev) => ({ ...prev, [p.id]: e.target.value }))} placeholder="دلایل و ضرورت" className="w-full text-xs p-2.5 bg-white border border-orange-200 rounded-xl" />
+                  <button onClick={() => handleResubmit(p)} className="bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold">ذخیره اصلاحات و ارسال مجدد</button>
+                </div>
+              )}
+              {(p.history?.length || 0) > 0 && <details className="text-[11px] text-slate-500"><summary className="cursor-pointer font-bold">تاریخچه اقدامات ({toPersianDigits(p.history?.length || 0)})</summary><div className="mt-2 space-y-1">{p.history?.map((entry) => <div key={entry.id} className="p-2 bg-slate-50 rounded-lg">{entry.action} — {entry.actorName} — {toPersianDigits(entry.dateJalali)} {toPersianDigits(entry.timeString)}{entry.notes ? ` — ${entry.notes}` : ''}</div>)}</div></details>}
             </div>
           ))}
         </div>

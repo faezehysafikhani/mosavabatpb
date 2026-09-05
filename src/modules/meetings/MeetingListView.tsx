@@ -45,7 +45,7 @@ export const MeetingListView: React.FC = () => {
         searchTerm,
         status: statusFilter,
         departmentId: departmentFilter,
-        participantUserId: currentUser.role === 'ADMIN' ? undefined : currentUser.id,
+        participantUserId: currentUser.role === 'ADMIN' || currentUser.role === 'CEO' ? undefined : currentUser.id,
         pageSize: 50,
       });
       if (res.isSuccess) {
@@ -123,6 +123,10 @@ export const MeetingListView: React.FC = () => {
             className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-700"
           >
             <option value="ALL">تمام وضعیت‌ها</option>
+            <option value="WAITING_FOR_CEO_APPROVAL">در انتظار تأیید دستورکار</option>
+            <option value="AGENDA_RETURNED">دستورکار برگشتی</option>
+            <option value="READY_FOR_INVITATION">آماده ارسال دعوتنامه</option>
+            <option value="INVITATION_SENT">دعوتنامه ارسال شده</option>
             <option value="SCHEDULED">برنامه‌ریزی شده</option>
             <option value="IN_PROGRESS">در حال برگزاری</option>
             <option value="HELD">برگزار شده / خاتمه یافته</option>
