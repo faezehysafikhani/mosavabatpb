@@ -3,6 +3,7 @@ import { Building2, MessageSquare, CalendarDays, Palette, Save, Send, Plus, Penc
 import { useApp } from '../../context/AppContext';
 import { loadLocalValue, saveLocalValue } from '../../services/localStore';
 import { toPersianDigits } from '../../utils/formatters';
+import { smsService, SmsSettings } from '../../services/smsService';
 
 type GeneralSubTab = 'ORG' | 'SMS' | 'CALENDAR' | 'THEME';
 
@@ -26,28 +27,6 @@ const DEFAULT_ORG_INFO: OrgInfo = {
   address: '',
 };
 
-interface SmsSettings {
-  provider: string;
-  baseUrl: string;
-  hasApiKey: boolean;
-  senderNumber: string;
-  isEnabled: boolean;
-  letterTemplate: string;
-  referralTemplate: string;
-  meetingTemplate: string;
-}
-
-const DEFAULT_SMS_SETTINGS: SmsSettings = {
-  provider: 'کاوه نگار (Kavenegar)',
-  baseUrl: 'https://api.kavenegar.com/v1',
-  hasApiKey: false,
-  senderNumber: '',
-  isEnabled: false,
-  letterTemplate: 'نامه شماره {{شماره}} برای شما ثبت شد.',
-  referralTemplate: 'مصوبه {{شماره}} به شما ارجاع شد. مهلت اقدام: {{مهلت}}',
-  meetingTemplate: 'جلسه «{{عنوان}}» در تاریخ {{تاریخ}} ساعت {{ساعت}} برگزار می‌شود.',
-};
-
 interface CalendarEntry {
   id: string;
   name: string;
@@ -66,7 +45,7 @@ export const GeneralSettingsTab: React.FC = () => {
   const [subTab, setSubTab] = useState<GeneralSubTab>('ORG');
 
   const [orgInfo, setOrgInfo] = useState<OrgInfo>(() => loadLocalValue('orgInfo', DEFAULT_ORG_INFO));
-  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => loadLocalValue('smsSettings', DEFAULT_SMS_SETTINGS));
+  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => smsService.getSettings());
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('');
@@ -80,19 +59,19 @@ export const GeneralSettingsTab: React.FC = () => {
     showToast('تنظیمات سازمان', 'اطلاعات سازمان با موفقیت ذخیره شد.', 'success');
   };
 
-  const handleSaveSmsSettings = () => {
-    const next: SmsSettings = { ...smsSettings, hasApiKey: smsSettings.hasApiKey || Boolean(apiKeyInput) };
-    setSmsSettings(next);
-    saveLocalValue('smsSettings', next);
+  const handleSaveSmsSettings = async () => {
+    const response = await smsService.updateSettings(smsSettings, apiKeyInput);
+    setSmsSettings(response.data);
     setApiKeyInput('');
     showToast('تنظیمات پنل پیامکی', 'تنظیمات پیامکی ذخیره شد.', 'success');
   };
 
-  const handleSendTest = () => {
+  const handleSendTest = async () => {
     if (!testPhone || !testMessage) {
       showToast('خطا', 'شماره تلفن و متن آزمایشی را وارد کنید.', 'error');
       return;
     }
+    await smsService.sendTest(testPhone, testMessage);
     showToast('ارسال آزمایشی', `پیامک آزمایشی به ${toPersianDigits(testPhone)} شبیه‌سازی شد (Mock).`, 'info');
     setTestMessage('');
   };
@@ -211,7 +190,9 @@ export const GeneralSettingsTab: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">سرویس‌دهنده</label>
-                <input type="text" value={smsSettings.provider} readOnly className="w-full text-xs p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-600" />
+                <select value={smsSettings.provider} onChange={(e) => setSmsSettings({ ...smsSettings, provider: e.target.value as 'KAVENEGAR' })} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700">
+                  <option value="KAVENEGAR">کاوه‌نگار</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">آدرس پایه رسمی کاوه نگار</label>
@@ -223,7 +204,7 @@ export const GeneralSettingsTab: React.FC = () => {
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder={smsSettings.hasApiKey ? 'قبلاً ذخیره شده، برای تغییر کلید جدید وارد کنید' : 'کلید API را وارد کنید'}
+                  placeholder={smsSettings.hasApiKey ? 'کلید قبلاً ذخیره شده است؛ برای تغییر، کلید جدید وارد کنید.' : 'کلید API را وارد کنید'}
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
                   dir="ltr"
                 />
@@ -245,8 +226,14 @@ export const GeneralSettingsTab: React.FC = () => {
                 <textarea rows={2} value={smsSettings.referralTemplate} onChange={(e) => setSmsSettings({ ...smsSettings, referralTemplate: e.target.value })} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">متن پیامک جلسه</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">پیامک اطلاع‌رسانی جلسه</label>
                 <textarea rows={2} value={smsSettings.meetingTemplate} onChange={(e) => setSmsSettings({ ...smsSettings, meetingTemplate: e.target.value })} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                <p className="text-[10px] text-slate-400 mt-1" dir="ltr">{'{meetingTitle} {meetingDate} {meetingTime} {departmentName}'}</p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">پیامک رد پیشنهاد</label>
+                <textarea rows={2} value={smsSettings.proposalRejectionTemplate} onChange={(e) => setSmsSettings({ ...smsSettings, proposalRejectionTemplate: e.target.value })} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none" />
+                <p className="text-[10px] text-slate-400 mt-1" dir="ltr">{'{proposalTitle} {organizationName}'}</p>
               </div>
             </div>
 

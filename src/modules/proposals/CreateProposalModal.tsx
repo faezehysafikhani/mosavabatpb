@@ -9,20 +9,19 @@ interface CreateProposalModalProps {
 }
 
 export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, showToast, triggerRefresh } = useApp();
+  const { currentUser, availableUsers, showToast, triggerRefresh } = useApp();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [presenterUserId, setPresenterUserId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const isOfficeManager = currentUser.role === 'ADMIN' || currentUser.role === 'SECRETARY';
-  const requiresOfficeReview = !isOfficeManager;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim()) {
-      showToast('خطا', 'عنوان و توضیحات الزامی است.', 'error');
+    const presenter = availableUsers.find((user) => user.id === presenterUserId);
+    if (!title.trim() || !description.trim() || !presenter) {
+      showToast('خطا', 'عنوان، توضیحات و ارائه‌دهنده الزامی است.', 'error');
       return;
     }
     setIsSubmitting(true);
@@ -34,16 +33,17 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
         proposerUserId: currentUser.id,
         proposerDepartmentId: currentUser.departmentId,
         proposerDepartmentName: currentUser.departmentName,
-        dateJalali: '۱۴۰۳/۰۶/۲۸',
-        requiresOfficeReview,
+        presenterUserId: presenter.id,
+        presenterName: presenter.fullName,
       });
       showToast(
         'ثبت مصوبه پیشنهادی',
-        requiresOfficeReview ? 'برای بررسی به کارتابل مسئول دفتر ارسال شد.' : 'برای بررسی به کارتابل مدیرعامل ارسال شد.',
+        'برای بررسی مستقیماً به کارتابل مدیرعامل ارسال شد.',
         'success'
       );
       setTitle('');
       setDescription('');
+      setPresenterUserId('');
       triggerRefresh();
       onClose();
     } finally {
@@ -62,7 +62,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             <div>
               <h3 className="text-sm font-bold text-white">ثبت مصوبه پیشنهادی جدید</h3>
               <p className="text-[11px] text-teal-200">
-                {requiresOfficeReview ? 'برای بررسی مسئول دفتر و سپس تصمیم مدیرعامل ارسال می‌شود' : 'برای بررسی و تصمیم مدیرعامل ارسال می‌شود'}
+                برای بررسی و تصمیم مستقیماً به کارتابل مدیرعامل ارسال می‌شود
               </p>
             </div>
           </div>
@@ -72,6 +72,13 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">ارائه‌دهنده *</label>
+            <select value={presenterUserId} onChange={(e) => setPresenterUserId(e.target.value)} required className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+              <option value="">انتخاب ارائه‌دهنده...</option>
+              {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} ({user.title})</option>)}
+            </select>
+          </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">عنوان *</label>
             <input
@@ -98,7 +105,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
             </button>
             <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer">
               <Send className="w-4 h-4" />
-              <span>{isSubmitting ? 'در حال ارسال...' : requiresOfficeReview ? 'ارسال به کارتابل مسئول دفتر' : 'ارسال به کارتابل مدیرعامل'}</span>
+              <span>{isSubmitting ? 'در حال ارسال...' : 'ارسال به کارتابل مدیرعامل'}</span>
             </button>
           </div>
         </form>

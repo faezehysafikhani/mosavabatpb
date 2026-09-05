@@ -1,7 +1,8 @@
 import { Meeting, MeetingStatus, ApiResponse, ApiFilterParams, PagedResult } from '../types';
-import { mockMeetings, mockResolutions } from '../mock/data';
+import { mockDepartments, mockMeetings, mockResolutions } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { loadLocalCollection, saveLocalCollection } from './localStore';
+import { smsService } from './smsService';
 
 export interface CreateMeetingDto {
   title: string;
@@ -112,7 +113,7 @@ class MockMeetingService implements IMeetingService {
       secretaryId: dto.secretaryId,
       secretaryName: dto.members.find((m) => m.userId === dto.secretaryId)?.fullName || 'دبیر جلسه',
       departmentId: dto.departmentId,
-      departmentName: 'معاونت برنامه‌ریزی و فناوری',
+      departmentName: mockDepartments.find((department) => department.id === dto.departmentId)?.name || 'واحد برگزارکننده',
       status: 'SCHEDULED',
       description: dto.description || '',
       members: dto.members,
@@ -125,6 +126,7 @@ class MockMeetingService implements IMeetingService {
 
     meetings.unshift(newMeeting);
     this.saveMeetingsData(meetings);
+    await smsService.sendMeetingNotification(newMeeting);
     return apiClient.simulateNetwork(newMeeting, 200);
   }
 

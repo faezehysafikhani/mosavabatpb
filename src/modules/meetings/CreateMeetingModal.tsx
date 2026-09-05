@@ -1,11 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { meetingService } from '../../services/meetingService';
 import { proposalService } from '../../services/proposalService';
 import { mockDepartments } from '../../mock/data';
 import { PersianDatePicker } from '../../components/common/PersianDatePicker';
 import { PersianTimePicker } from '../../components/common/PersianTimePicker';
-import { X, Plus, Trash2, Calendar, Clock, MapPin, Users, FileText, CheckCircle2, Search, UserCheck, Lightbulb } from 'lucide-react';
+import { SearchableUserMultiSelect } from '../../components/common/SearchableUserMultiSelect';
+import { X, Plus, Trash2, Calendar, Clock, MapPin, Users, FileText, UserCheck, Lightbulb } from 'lucide-react';
 import { MeetingType, MeetingMember, AgendaItem, Proposal } from '../../types';
 
 const toEnglishDigits = (value: string): string =>
@@ -54,6 +55,8 @@ export const CreateMeetingModal: React.FC = () => {
       setNewAgendaTitle('');
       setNewAgendaPresenterId('');
       setConsumedProposalIds([]);
+      setSelectedProposalId('');
+      setProposalRelatedUserIds([]);
     }
   }, [isCreateMeetingOpen, createMeetingInitialDate]);
 
@@ -63,6 +66,7 @@ export const CreateMeetingModal: React.FC = () => {
   const [selectedProposalId, setSelectedProposalId] = useState('');
   const [proposalStartTime, setProposalStartTime] = useState('09:00');
   const [proposalEndTime, setProposalEndTime] = useState('09:30');
+  const [proposalRelatedUserIds, setProposalRelatedUserIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (isCreateMeetingOpen) {
@@ -82,26 +86,7 @@ export const CreateMeetingModal: React.FC = () => {
 
   // Selected members
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [memberSearchQuery, setMemberSearchQuery] = useState('');
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Filter available users for search in members
-  const filteredUsers = useMemo(() => {
-    if (!memberSearchQuery.trim()) return availableUsers;
-    const q = memberSearchQuery.toLowerCase();
-    return availableUsers.filter(
-      (u) =>
-        u.fullName.toLowerCase().includes(q) ||
-        u.title.toLowerCase().includes(q) ||
-        u.departmentName.toLowerCase().includes(q) ||
-        u.nationalCode.includes(q)
-    );
-  }, [availableUsers, memberSearchQuery]);
-
-  const selectedUsers = useMemo(() => {
-    return availableUsers.filter((u) => selectedMemberIds.includes(u.id));
-  }, [availableUsers, selectedMemberIds]);
 
   if (!isCreateMeetingOpen) return null;
 
@@ -139,6 +124,9 @@ export const CreateMeetingModal: React.FC = () => {
     if (!proposal) return;
     const minutes = getMinutesDiff(proposalStartTime, proposalEndTime);
     const presenterName = proposal.confirmedPresenterName || proposal.proposerName;
+    const relatedUsers = availableUsers
+      .filter((user) => proposalRelatedUserIds.includes(user.id))
+      .map((user) => ({ userId: user.id, fullName: user.fullName, phone: user.phone }));
 
     const newAg: AgendaItem = {
       id: `ag-${Date.now()}`,
@@ -152,6 +140,8 @@ export const CreateMeetingModal: React.FC = () => {
       allocatedMinutes: minutes,
       isDiscussed: false,
       status: 'PENDING',
+      sourceProposalId: proposal.id,
+      relatedUsers,
     };
     setAgendas([...agendas, newAg]);
     setConfirmedProposals((prev) => prev.filter((p) => p.id !== proposal.id));
@@ -159,22 +149,11 @@ export const CreateMeetingModal: React.FC = () => {
     setSelectedProposalId('');
     setProposalStartTime('09:00');
     setProposalEndTime('09:30');
+    setProposalRelatedUserIds([]);
   };
 
   const handleRemoveAgenda = (id: string) => {
     setAgendas(agendas.filter((a) => a.id !== id).map((a, idx) => ({ ...a, rowNumber: idx + 1, order: idx + 1 })));
-  };
-
-  const toggleMember = (userId: string) => {
-    if (selectedMemberIds.includes(userId)) {
-      setSelectedMemberIds(selectedMemberIds.filter((id) => id !== userId));
-    } else {
-      setSelectedMemberIds([...selectedMemberIds, userId]);
-    }
-  };
-
-  const removeMember = (userId: string) => {
-    setSelectedMemberIds(selectedMemberIds.filter((id) => id !== userId));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -225,7 +204,10 @@ export const CreateMeetingModal: React.FC = () => {
 
       if (res.isSuccess) {
         await Promise.all(
-          consumedProposalIds.map((proposalId) => proposalService.markConvertedToAgenda(proposalId, res.data.id, res.data.title))
+          consumedProposalIds.map((proposalId) => {
+            const agenda = agendas.find((item) => item.sourceProposalId === proposalId);
+            return proposalService.markConvertedToAgenda(proposalId, res.data.id, res.data.title, agenda?.relatedUsers || []);
+          })
         );
         showToast('ثبت موفق', `جلسه "${res.data.title}" با شماره ${res.data.meetingNumber} ایجاد گردید.`, 'success');
         triggerRefresh();
@@ -382,78 +364,7 @@ export const CreateMeetingModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Selected Members Chips */}
-            {selectedUsers.length > 0 && (
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-2xl">
-                <div className="text-[11px] font-bold text-slate-600 mb-2">افراد انتخاب‌شده:</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedUsers.map((u) => (
-                    <span
-                      key={u.id}
-                      className="inline-flex items-center gap-1.5 bg-teal-100/90 text-teal-900 border border-teal-300 text-[11px] font-medium py-1 px-2.5 rounded-full shadow-2xs"
-                    >
-                      <span className="w-4 h-4 rounded-full bg-teal-800 text-white text-[9px] font-bold flex items-center justify-center">
-                        {u.fullName[0]}
-                      </span>
-                      <span>{u.fullName}</span>
-                      <span className="text-[10px] text-teal-700">({u.title})</span>
-                      <button
-                        type="button"
-                        onClick={() => removeMember(u.id)}
-                        className="hover:bg-teal-200 text-teal-800 rounded-full p-0.5 ml-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Member Search input */}
-            <div className="relative">
-              <input
-                type="text"
-                value={memberSearchQuery}
-                onChange={(e) => setMemberSearchQuery(e.target.value)}
-                placeholder="جستجو در نام کاربر، سمت سازمانی یا واحد..."
-                className="w-full text-xs p-2.5 pr-8 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
-              />
-              <Search className="w-4 h-4 text-slate-400 absolute right-2.5 top-3" />
-            </div>
-
-            {/* Users grid selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1 border border-slate-100 rounded-xl bg-white">
-              {filteredUsers.map((user) => {
-                const isSelected = selectedMemberIds.includes(user.id);
-                return (
-                  <div
-                    key={user.id}
-                    onClick={() => toggleMember(user.id)}
-                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isSelected
-                        ? 'border-teal-500 bg-teal-50/80 shadow-2xs'
-                        : 'border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-teal-800 text-white text-[11px] font-bold flex items-center justify-center">
-                        {user.fullName[0]}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-800">{user.fullName}</div>
-                        <div className="text-[10px] text-slate-500">{user.title} - {user.departmentName}</div>
-                      </div>
-                    </div>
-                    {isSelected ? (
-                      <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
-                    ) : (
-                      <div className="w-4 h-4 rounded border border-slate-300 shrink-0"></div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <SearchableUserMultiSelect users={availableUsers} selectedIds={selectedMemberIds} onChange={setSelectedMemberIds} label="اعضا و مدعوین" maxHeightClassName="max-h-48" />
           </div>
 
           {/* Agenda Items */}
@@ -474,7 +385,7 @@ export const CreateMeetingModal: React.FC = () => {
                   <div className="sm:col-span-6">
                     <select
                       value={selectedProposalId}
-                      onChange={(e) => setSelectedProposalId(e.target.value)}
+                      onChange={(e) => { setSelectedProposalId(e.target.value); setProposalRelatedUserIds([]); }}
                       className="w-full text-xs p-2.5 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium"
                     >
                       <option value="">انتخاب تایید جلسه...</option>
@@ -499,6 +410,16 @@ export const CreateMeetingModal: React.FC = () => {
                     </button>
                   </div>
                 </div>
+                {selectedProposalId && (
+                  <div className="p-3 bg-white/80 border border-blue-100 rounded-xl">
+                    <SearchableUserMultiSelect
+                      users={availableUsers}
+                      selectedIds={proposalRelatedUserIds}
+                      onChange={setProposalRelatedUserIds}
+                      label="افراد مرتبط با این موضوع"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -570,6 +491,9 @@ export const CreateMeetingModal: React.FC = () => {
                       <div className="text-[11px] text-slate-500 mt-0.5">
                         ارائه‌دهنده: <strong className="text-teal-900">{ag.presenterName || ag.presenter}</strong> ({ag.allocatedMinutes} دقیقه)
                       </div>
+                      {ag.relatedUsers && ag.relatedUsers.length > 0 && (
+                        <div className="text-[10px] text-blue-700 mt-1">افراد مرتبط: {ag.relatedUsers.map((user) => user.fullName).join('، ')}</div>
+                      )}
                     </div>
                   </div>
                   <button

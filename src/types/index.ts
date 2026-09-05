@@ -103,10 +103,9 @@ export interface Organization {
   phone?: string;
 }
 
-// Pre-meeting proposed-resolution workflow: the office manager (secretary)
-// registers a topic -> CEO approves or rejects it -> a rejected item can
-// only be recovered (sent back for review) by the office manager -> an
-// approved item returns to the office manager's cartable, where they
+// Pre-meeting proposed-resolution workflow: a proposer registers a topic
+// and it goes directly to the CEO. An approved item then enters the office
+// manager's cartable, where they
 // confirm it as a "تایید جلسه" (meeting confirmation) and assign its
 // presenter -> confirmed items become pickable as a ready-made agenda item
 // while creating a new meeting (see CreateMeetingModal), where the office
@@ -127,6 +126,8 @@ export interface Proposal {
   proposerUserId?: string;
   proposerDepartmentId: string;
   proposerDepartmentName: string;
+  presenterUserId?: string;
+  presenterName: string;
   description: string;
   notes?: string;
   dateJalali: string;
@@ -137,6 +138,7 @@ export interface Proposal {
   confirmedPresenterName?: string;
   confirmedDateJalali?: string;
   confirmedTimeString?: string;
+  relatedUsers?: RelatedUserRef[];
   assignedMeetingId?: string;
   assignedMeetingTitle?: string;
   createdAt: string;
@@ -179,6 +181,14 @@ export interface AgendaItem {
   description?: string;
   proposedResolutionDraft?: string;
   isDiscussed: boolean;
+  sourceProposalId?: string;
+  relatedUsers?: RelatedUserRef[];
+}
+
+export interface RelatedUserRef {
+  userId: string;
+  fullName: string;
+  phone?: string;
 }
 
 export interface Attachment {

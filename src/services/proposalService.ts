@@ -3,6 +3,7 @@ import { mockProposals } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { loadLocalValue, saveLocalValue } from './localStore';
 import { toPersianDigits } from '../utils/formatters';
+import { smsService } from './smsService';
 
 const STORAGE_KEY = 'proposals';
 
@@ -12,14 +13,18 @@ export interface CreateProposalDto {
   proposerUserId?: string;
   proposerDepartmentId: string;
   proposerDepartmentName: string;
+  presenterUserId: string;
+  presenterName: string;
   description: string;
-  dateJalali: string;
-  requiresOfficeReview?: boolean;
 }
 
 const getCurrentTimeString = (): string => toPersianDigits(
   new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 );
+
+const getJalaliDate = (date: Date = new Date()): string => new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+  year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(date).replace(/[\u200e\u200f]/g, '');
 
 export interface IProposalService {
   getProposals(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Proposal>>>;
@@ -27,12 +32,18 @@ export interface IProposalService {
   reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes?: string): Promise<ApiResponse<Proposal>>;
   forwardToCeo(id: string): Promise<ApiResponse<Proposal>>;
   recoverProposal(id: string): Promise<ApiResponse<Proposal>>;
-  confirmForMeeting(id: string, presenterId: string, presenterName: string): Promise<ApiResponse<Proposal>>;
-  markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>>;
+  confirmForMeeting(id: string): Promise<ApiResponse<Proposal>>;
+  markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string, relatedUsers?: Proposal['relatedUsers']): Promise<ApiResponse<Proposal>>;
 }
 
 class MockProposalService implements IProposalService {
-  private getData = (): Proposal[] => loadLocalValue(STORAGE_KEY, mockProposals);
+  private getData = (): Proposal[] => loadLocalValue<Proposal[]>(STORAGE_KEY, mockProposals).map((proposal) => ({
+    ...proposal,
+    status: proposal.status === 'PENDING_OFFICE_REVIEW' ? 'PENDING_CEO_REVIEW' : proposal.status,
+    presenterUserId: proposal.presenterUserId || proposal.confirmedPresenterId || proposal.proposerUserId,
+    presenterName: proposal.presenterName || proposal.confirmedPresenterName || proposal.proposerName,
+    dateJalali: proposal.dateJalali || getJalaliDate(new Date(proposal.createdAt)),
+  }));
   private saveData = (proposals: Proposal[]) => saveLocalValue(STORAGE_KEY, proposals);
 
   public async getProposals(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Proposal>>> {
@@ -60,12 +71,12 @@ class MockProposalService implements IProposalService {
 
   public async createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
-    const { requiresOfficeReview, ...rest } = dto;
     const newProposal: Proposal = {
       id: `prop-${Date.now()}`,
-      ...rest,
+      ...dto,
+      dateJalali: getJalaliDate(),
       attachments: [],
-      status: requiresOfficeReview ? 'PENDING_OFFICE_REVIEW' : 'PENDING_CEO_REVIEW',
+      status: 'PENDING_CEO_REVIEW',
       createdAt: new Date().toISOString(),
     };
     proposals.unshift(newProposal);
@@ -87,9 +98,11 @@ class MockProposalService implements IProposalService {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
+    if (proposal.status !== 'PENDING_CEO_REVIEW') throw new Error('فقط پیشنهادهای در انتظار مدیرعامل قابل بررسی هستند');
     proposal.status = decision;
     proposal.managementDecisionNotes = notes;
     this.saveData(proposals);
+    if (decision === 'REJECTED') await smsService.sendProposalRejection(proposal);
     return apiClient.simulateNetwork(proposal, 120);
   }
 
@@ -103,27 +116,28 @@ class MockProposalService implements IProposalService {
     return apiClient.simulateNetwork(proposal, 120);
   }
 
-  public async confirmForMeeting(id: string, presenterId: string, presenterName: string): Promise<ApiResponse<Proposal>> {
+  public async confirmForMeeting(id: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
     if (proposal.status !== 'APPROVED') throw new Error('فقط موارد تایید شده توسط مدیرعامل قابل تبدیل به تایید جلسه هستند');
     proposal.status = 'CONFIRMED_FOR_MEETING';
-    proposal.confirmedPresenterId = presenterId;
-    proposal.confirmedPresenterName = presenterName;
-    proposal.confirmedDateJalali = '۱۴۰۳/۰۶/۲۸';
+    proposal.confirmedPresenterId = proposal.presenterUserId;
+    proposal.confirmedPresenterName = proposal.presenterName;
+    proposal.confirmedDateJalali = getJalaliDate();
     proposal.confirmedTimeString = getCurrentTimeString();
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 120);
   }
 
-  public async markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string): Promise<ApiResponse<Proposal>> {
+  public async markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string, relatedUsers: Proposal['relatedUsers'] = []): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
     proposal.status = 'CONVERTED_TO_AGENDA';
     proposal.assignedMeetingId = meetingId;
     proposal.assignedMeetingTitle = meetingTitle;
+    proposal.relatedUsers = relatedUsers;
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 100);
   }

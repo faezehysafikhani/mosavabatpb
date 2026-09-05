@@ -293,6 +293,11 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                           ارائه‌دهنده: <strong className="text-teal-900">{ag.presenterName || ag.presenter}</strong> | 
                           مدت زمان: {toPersianDigits(ag.allocatedMinutes)} دقیقه
                         </div>
+                        {ag.relatedUsers && ag.relatedUsers.length > 0 && (
+                          <div className="text-[10px] text-blue-700 mt-1">
+                            افراد مرتبط با این موضوع: {ag.relatedUsers.map((user) => user.fullName).join('، ')}
+                          </div>
+                        )}
                       </div>
                     </div>
 
