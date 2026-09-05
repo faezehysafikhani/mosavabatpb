@@ -238,6 +238,9 @@ export type ResolutionApprovalStatus =
 
 // Resolution Overall Workflow/Execution Status
 export type ResolutionExecutionStatus = 
+  | 'PENDING_OFFICE_SIGNATURE' // در انتظار امضای مسئول دفتر
+  | 'PENDING_CEO_SIGNATURE'    // در انتظار امضای مدیرعامل
+  | 'PENDING_ADMIN_SIGNATURE'  // در انتظار امضای ادمین
   | 'NOT_STARTED'       // شروع نشده
   | 'IN_PROGRESS'       // در حال انجام
   | 'DONE_BY_ASSIGNEE'  // انجام شده توسط مسئول
@@ -279,9 +282,33 @@ export interface VerificationConfig {
   steps: VerificationStep[];
 }
 
+export type ResolutionSignerRole = 'OFFICE_MANAGER' | 'CEO' | 'ADMIN';
+export type ResolutionSignatureStatus = 'WAITING_TURN' | 'PENDING' | 'SIGNED';
+
+export interface ResolutionSignature {
+  id: string;
+  signerUserId: string;
+  signerName: string;
+  signerTitle: string;
+  signerRole: ResolutionSignerRole;
+  order: 1 | 2 | 3;
+  status: ResolutionSignatureStatus;
+  signedAt?: string;
+  signedDateJalali?: string;
+  signedTimeString?: string;
+}
+
+export interface ResolutionSignatureWorkflow {
+  status: 'PENDING_OFFICE_SIGNATURE' | 'PENDING_CEO_SIGNATURE' | 'PENDING_ADMIN_SIGNATURE' | 'COMPLETED';
+  currentStepIndex: number;
+  steps: ResolutionSignature[];
+}
+
 export interface Resolution {
   id: string;
   resolutionNumber: string;    // e.g. "مصوبه-۱۴۰۳-۹۸"
+  meetingResolutionNumber?: string;
+  letterNumber?: string;
   meetingId: string;
   meetingTitle: string;
   meetingNumber: string;
@@ -310,6 +337,7 @@ export interface Resolution {
   
   // Verification configuration
   verificationConfig: VerificationConfig;
+  signatureWorkflow?: ResolutionSignatureWorkflow;
   
   // Attachments & Logs
   attachments: Attachment[];

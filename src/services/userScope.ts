@@ -23,6 +23,7 @@ export const isResolutionRelatedToUser = (resolution: Resolution, user: User): b
       (referral.targetType === 'DEPARTMENT' && referral.targetId === user.departmentId)
     ) ||
     resolution.verificationConfig.steps.some((step) => step.approverId === user.id) ||
+    resolution.signatureWorkflow?.steps.some((step) => step.signerUserId === user.id) ||
     // Department-wide visibility: everyone in the owning department can see the resolution,
     // not just the person it was personally assigned/referred to.
     (Boolean(resolution.responsibleDepartmentId) && resolution.responsibleDepartmentId === user.departmentId);

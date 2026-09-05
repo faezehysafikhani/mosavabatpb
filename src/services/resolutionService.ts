@@ -41,6 +41,7 @@ export interface CreateResolutionDto {
   referrals?: ResolutionReferral[];
   verificationConfig?: VerificationConfig;
   attachments?: Resolution['attachments'];
+  letterNumber?: string;
 }
 
 export interface IResolutionService {
@@ -53,6 +54,7 @@ export interface IResolutionService {
   completeResolutionTask(resolutionId: string, completionNotes: string, attachments?: Resolution['attachments']): Promise<ApiResponse<Resolution>>;
   approveVerificationStep(resolutionId: string, stepNumber: number, comments: string, approverName: string): Promise<ApiResponse<Resolution>>;
   rejectVerificationStep(resolutionId: string, stepNumber: number, rejectionReason: string, approverName: string): Promise<ApiResponse<Resolution>>;
+  signResolution(resolutionId: string, signerUserId: string): Promise<ApiResponse<Resolution>>;
 }
 
 class MockResolutionService implements IResolutionService {
@@ -62,6 +64,50 @@ class MockResolutionService implements IResolutionService {
   private persist() {
     saveLocalCollection('resolutions', this.resolutions);
     saveLocalCollection('activityLogs', this.activityLogs);
+  }
+
+  private createSignatureWorkflow() {
+    const users = loadLocalCollection('users', mockUsers);
+    const officeManager = users.find((user) => user.username === 'office-manager') || users.find((user) => user.role === 'SECRETARY');
+    const ceo = users.find((user) => user.username === 'ceo') || users.find((user) => user.role === 'CEO');
+    const admin = users.find((user) => user.id === 'user-admin') || users.find((user) => user.role === 'ADMIN');
+    if (!officeManager || !ceo || !admin) throw new Error('امضاکنندگان موردنیاز در فهرست کاربران تعریف نشده‌اند');
+    return {
+      status: 'PENDING_OFFICE_SIGNATURE' as const,
+      currentStepIndex: 0,
+      steps: [
+        { id: `sig-${Date.now()}-1`, signerUserId: officeManager.id, signerName: officeManager.fullName, signerTitle: officeManager.title, signerRole: 'OFFICE_MANAGER' as const, order: 1 as const, status: 'PENDING' as const },
+        { id: `sig-${Date.now()}-2`, signerUserId: ceo.id, signerName: ceo.fullName, signerTitle: ceo.title, signerRole: 'CEO' as const, order: 2 as const, status: 'WAITING_TURN' as const },
+        { id: `sig-${Date.now()}-3`, signerUserId: admin.id, signerName: admin.fullName, signerTitle: admin.title, signerRole: 'ADMIN' as const, order: 3 as const, status: 'WAITING_TURN' as const },
+      ],
+    };
+  }
+
+  private startExecution(resolution: Resolution) {
+    resolution.executionStatus = 'IN_PROGRESS';
+    if (!resolution.mainResponsibleUserId) return;
+    const tasks = loadLocalCollection('tasks', mockTasks);
+    if (tasks.some((task) => task.resolutionId === resolution.id)) return;
+    tasks.unshift({
+      id: `task-${Date.now()}`,
+      resolutionId: resolution.id,
+      resolutionNumber: resolution.resolutionNumber,
+      resolutionTitle: resolution.topicTitle,
+      meetingId: resolution.meetingId,
+      meetingTitle: resolution.meetingTitle,
+      assignedToUserId: resolution.mainResponsibleUserId,
+      assignedToName: resolution.mainResponsibleName || 'مسئول اجرا',
+      departmentId: resolution.responsibleDepartmentId || 'dept-1',
+      departmentName: resolution.responsibleDepartmentName || 'واحد مسئول',
+      referralDateJalali: resolution.assignedDateJalali || '—',
+      deadlineJalali: resolution.deadlineJalali || '—',
+      priority: resolution.priority,
+      status: 'IN_PROGRESS',
+      requiresVerification: resolution.verificationConfig.requiresVerification,
+      instructions: resolution.executionDescription || resolution.requestDescription,
+      attachments: resolution.attachments,
+    });
+    saveLocalCollection('tasks', tasks);
   }
 
   public async getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; requiresVerification?: boolean; relatedUserId?: string }): Promise<ApiResponse<PagedResult<Resolution>>> {
@@ -128,10 +174,13 @@ class MockResolutionService implements IResolutionService {
   public async createResolution(dto: CreateResolutionDto): Promise<ApiResponse<Resolution>> {
     const nextNum = this.resolutions.length + 98;
     const isApproved = dto.approvalStatus === 'APPROVED';
+    const meetingResolutionNumber = this.resolutions.filter((resolution) => resolution.meetingId === dto.meetingId).length + 1;
 
     const newResolution: Resolution = {
       id: `res-${Date.now()}`,
       resolutionNumber: `مصوبه-۱۴۰۳-${nextNum}`,
+      meetingResolutionNumber: String(meetingResolutionNumber),
+      letterNumber: dto.letterNumber,
       meetingId: dto.meetingId,
       meetingTitle: dto.meetingTitle,
       meetingNumber: dto.meetingNumber,
@@ -152,7 +201,7 @@ class MockResolutionService implements IResolutionService {
       assignedDateJalali: isApproved ? (dto.assignedDateJalali || '۱۴۰۳/۰۶/۲۸') : undefined,
       deadlineJalali: isApproved ? dto.deadlineJalali : undefined,
       priority: dto.priority || 'MEDIUM',
-      executionStatus: isApproved ? 'IN_PROGRESS' : 'NOT_STARTED',
+      executionStatus: isApproved ? 'PENDING_OFFICE_SIGNATURE' : 'NOT_STARTED',
       referrals: dto.referrals || [],
       verificationConfig: dto.verificationConfig || {
         requiresVerification: false,
@@ -160,56 +209,101 @@ class MockResolutionService implements IResolutionService {
         currentStepIndex: 0,
         steps: [],
       },
+      signatureWorkflow: isApproved ? this.createSignatureWorkflow() : undefined,
       attachments: dto.attachments || [],
       createdAt: new Date().toISOString(),
     };
 
     this.resolutions.unshift(newResolution);
 
-    // If approved and assigned to a user, create corresponding Task in cartable
-    if (isApproved && newResolution.mainResponsibleUserId) {
-      const tasks = loadLocalCollection('tasks', mockTasks);
-      tasks.unshift({
-        id: `task-${Date.now()}`,
-        resolutionId: newResolution.id,
-        resolutionNumber: newResolution.resolutionNumber,
-        resolutionTitle: newResolution.topicTitle,
-        meetingId: newResolution.meetingId,
-        meetingTitle: newResolution.meetingTitle,
-        assignedToUserId: newResolution.mainResponsibleUserId,
-        assignedToName: newResolution.mainResponsibleName || 'مسئول اجرا',
-        departmentId: newResolution.responsibleDepartmentId || 'dept-1',
-        departmentName: newResolution.responsibleDepartmentName || 'واحد مسئول',
-        referralDateJalali: newResolution.assignedDateJalali || '۱۴۰۳/۰۶/۲۸',
-        deadlineJalali: newResolution.deadlineJalali || '۱۴۰۳/۰۷/۱۵',
-        priority: newResolution.priority,
-        status: 'IN_PROGRESS',
-        requiresVerification: newResolution.verificationConfig.requiresVerification,
-        instructions: newResolution.executionDescription || newResolution.requestDescription,
-        attachments: newResolution.attachments,
-      });
-      saveLocalCollection('tasks', tasks);
-    }
-
-    // Add activity log
+    // Add activity logs to the existing resolution timeline.
+    const createdAt = Date.now();
     this.activityLogs.unshift({
-      id: `log-${Date.now()}`,
+      id: `log-${createdAt}`,
       targetType: 'RESOLUTION',
       targetId: newResolution.id,
-      action: isApproved ? 'تصویب و ابلاغ مصوبه' : 'ثبت نتیجه بررسی جلسه',
+      action: isApproved ? 'مصوبه تصویب شد' : 'ثبت نتیجه بررسی جلسه',
       actorName: 'دبیر شورای راهبری',
       actorRole: 'دبیرخانه جلسات',
       timestampJalali: '۱۴۰۳/۰۶/۲۸',
       timeString: '۱۱:۳۰',
-      details: isApproved
-        ? `مصوبه تصویب شد و به واحد ${newResolution.responsibleDepartmentName || ''} ارجاع گردید.`
-        : `وضعیت بررسی: ${dto.approvalStatus}`,
+      details: isApproved ? 'نتیجه بررسی جلسه به‌عنوان مصوبه ثبت شد.' : `وضعیت بررسی: ${dto.approvalStatus}`,
       badgeColor: isApproved ? 'teal' : 'amber',
     });
+    if (isApproved) {
+      this.activityLogs.unshift({
+        id: `log-${createdAt}-minutes`,
+        targetType: 'RESOLUTION',
+        targetId: newResolution.id,
+        action: 'صورت‌جلسه مصوبه ایجاد شد',
+        actorName: 'دبیر شورای راهبری',
+        actorRole: 'دبیرخانه جلسات',
+        timestampJalali: '۱۴۰۳/۰۶/۲۸',
+        timeString: '۱۱:۳۰',
+        details: 'صورت‌جلسه رسمی برای امضای ترتیبی مسئول دفتر، مدیرعامل و ادمین ایجاد گردید.',
+        badgeColor: 'blue',
+      });
+    }
 
     this.persist();
 
     return apiClient.simulateNetwork(newResolution, 200);
+  }
+
+  public async signResolution(resolutionId: string, signerUserId: string): Promise<ApiResponse<Resolution>> {
+    const resolution = this.resolutions.find((item) => item.id === resolutionId);
+    if (!resolution?.signatureWorkflow) throw new Error('صورت‌جلسه امضای مصوبه یافت نشد');
+    if (resolution.signatureWorkflow.status === 'COMPLETED') throw new Error('تمام امضاهای این مصوبه قبلاً تکمیل شده است');
+
+    const currentIndex = resolution.signatureWorkflow.currentStepIndex;
+    const currentStep = resolution.signatureWorkflow.steps[currentIndex];
+    if (!currentStep || currentStep.status !== 'PENDING') throw new Error('مرحله فعالی برای امضا وجود ندارد');
+    if (currentStep.signerUserId !== signerUserId) throw new Error('نوبت امضای این کاربر نیست');
+
+    const now = new Date();
+    currentStep.status = 'SIGNED';
+    currentStep.signedAt = now.toISOString();
+    currentStep.signedDateJalali = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now).replace(/[\u200e\u200f]/g, '');
+    currentStep.signedTimeString = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+
+    this.activityLogs.unshift({
+      id: `log-${Date.now()}`,
+      targetType: 'RESOLUTION',
+      targetId: resolution.id,
+      action: `${currentStep.signerTitle} صورت‌جلسه مصوبه را امضا کرد`,
+      actorName: currentStep.signerName,
+      actorRole: currentStep.signerTitle,
+      timestampJalali: currentStep.signedDateJalali,
+      timeString: currentStep.signedTimeString,
+      details: `امضای دیجیتال Mock مرحله ${currentStep.order} با شناسه کاربر ${currentStep.signerUserId} ثبت شد.`,
+      badgeColor: 'teal',
+    });
+
+    const nextStep = resolution.signatureWorkflow.steps[currentIndex + 1];
+    if (nextStep) {
+      nextStep.status = 'PENDING';
+      resolution.signatureWorkflow.currentStepIndex = currentIndex + 1;
+      resolution.signatureWorkflow.status = nextStep.signerRole === 'CEO' ? 'PENDING_CEO_SIGNATURE' : 'PENDING_ADMIN_SIGNATURE';
+      resolution.executionStatus = resolution.signatureWorkflow.status;
+    } else {
+      resolution.signatureWorkflow.status = 'COMPLETED';
+      this.startExecution(resolution);
+      this.activityLogs.unshift({
+        id: `log-${Date.now()}-execution`,
+        targetType: 'RESOLUTION',
+        targetId: resolution.id,
+        action: 'تکمیل امضاها و آغاز فرآیند اجرای مصوبه',
+        actorName: currentStep.signerName,
+        actorRole: currentStep.signerTitle,
+        timestampJalali: currentStep.signedDateJalali,
+        timeString: currentStep.signedTimeString,
+        details: `هر سه امضا تکمیل شد و مصوبه به ${resolution.mainResponsibleName || 'مسئول اجرا'} ارجاع گردید.`,
+        badgeColor: 'blue',
+      });
+    }
+
+    this.persist();
+    return apiClient.simulateNetwork(resolution, 160);
   }
 
   public async updateResolution(id: string, dto: Partial<Resolution>): Promise<ApiResponse<Resolution>> {
@@ -244,6 +338,9 @@ class MockResolutionService implements IResolutionService {
     if (resIndex === -1) throw new Error('مصوبه یافت نشد');
 
     const res = this.resolutions[resIndex];
+    if (res.signatureWorkflow && res.signatureWorkflow.status !== 'COMPLETED') {
+      throw new Error('تا پیش از تکمیل هر سه امضا، فرآیند اجرای مصوبه قابل شروع یا تکمیل نیست');
+    }
     const requiresVerif = res.verificationConfig?.requiresVerification && res.verificationConfig.steps.length > 0;
 
     res.completionNotes = completionNotes;

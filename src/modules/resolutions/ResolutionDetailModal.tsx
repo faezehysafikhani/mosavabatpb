@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { resolutionService } from '../../services/resolutionService';
-import { Resolution, ActivityLog } from '../../types';
+import { meetingService } from '../../services/meetingService';
+import { Resolution, ActivityLog, Meeting } from '../../types';
 import { 
   X, 
   FileCheck2, 
@@ -17,7 +18,8 @@ import {
   ArrowLeft,
   Paperclip,
   Check,
-  RotateCcw
+  RotateCcw,
+  PenTool
 } from 'lucide-react';
 import { 
   toPersianDigits, 
@@ -38,11 +40,13 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
   resolutionId,
   onClose,
 }) => {
-  const { currentUser, showToast, triggerRefresh, refreshTrigger } = useApp();
+  const { currentUser, availableUsers, showToast, triggerRefresh, refreshTrigger } = useApp();
 
   const [resolution, setResolution] = useState<Resolution | null>(null);
+  const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSigning, setIsSigning] = useState(false);
 
   // Complete task form state
   const [completionNotes, setCompletionNotes] = useState('');
@@ -69,6 +73,8 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
       if (resRes.isSuccess && resRes.data) {
         setResolution(resRes.data);
+        const meetingRes = await meetingService.getMeetingById(resRes.data.meetingId);
+        setMeeting(meetingRes.isSuccess ? meetingRes.data : null);
       }
       if (logRes.isSuccess) {
         setLogs(logRes.data);
@@ -93,6 +99,43 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
   const isAssignee = currentUser.id === resolution.mainResponsibleUserId || currentUser.role === 'ADMIN';
   const isCurrentApprover = Boolean(currentStep) && (currentUser.id === currentStep.approverId || currentUser.role === 'ADMIN');
+  const signatureWorkflow = resolution.signatureWorkflow;
+  const activeSignature = signatureWorkflow?.steps[signatureWorkflow.currentStepIndex];
+  const canSign = activeSignature?.status === 'PENDING' && activeSignature.signerUserId === currentUser.id;
+  const invitees = Array.from(new Map([
+    ...(resolution.mainResponsibleName ? [{
+      id: resolution.mainResponsibleUserId || resolution.mainResponsibleName,
+      name: resolution.mainResponsibleName,
+      title: availableUsers.find((user) => user.id === resolution.mainResponsibleUserId)?.title || 'مسئول اجرای مصوبه',
+      department: resolution.responsibleDepartmentName || '',
+    }] : []),
+    ...resolution.referrals.map((referral) => {
+      const user = referral.targetType === 'USER' ? availableUsers.find((item) => item.id === referral.targetId) : undefined;
+      return {
+        id: `${referral.targetType}-${referral.targetId}`,
+        name: referral.targetName,
+        title: user?.title || (referral.assignedRole === 'COOPERATOR' ? 'همکار اجرای مصوبه' : 'مدعو'),
+        department: user?.departmentName || (referral.targetType === 'DEPARTMENT' ? referral.targetName : ''),
+      };
+    }),
+  ].map((item) => [item.id, item])).values());
+
+  const handleSignResolution = async () => {
+    if (!canSign || !window.confirm('آیا از امضای این مصوبه اطمینان دارید؟')) return;
+    setIsSigning(true);
+    try {
+      const result = await resolutionService.signResolution(resolution.id, currentUser.id);
+      if (result.isSuccess) {
+        showToast('امضای مصوبه', 'امضای دیجیتال شما ثبت و صورت‌جلسه به مرحله بعد ارسال شد.', 'success');
+        triggerRefresh();
+        await loadResolutionData();
+      }
+    } catch (error) {
+      showToast('خطا در امضا', error instanceof Error ? error.message : 'ثبت امضا انجام نشد.', 'error');
+    } finally {
+      setIsSigning(false);
+    }
+  };
 
   const handleCompleteTask = async () => {
     if (!completionNotes) {
@@ -204,6 +247,87 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
         {/* Modal Scrollable Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+
+          {/* Formal resolution minutes and sequential signatures */}
+          {signatureWorkflow && (
+            <section className="rounded-3xl border-2 border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="bg-slate-900 text-white px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-teal-300" />
+                  <div>
+                    <h4 className="font-extrabold text-sm">صورت‌جلسه رسمی مصوبه</h4>
+                    <p className="text-[10px] text-slate-300 mt-0.5">سند امضای ترتیبی و ابلاغ جهت اجرا</p>
+                  </div>
+                </div>
+                <span className={`text-[11px] font-bold px-3 py-1 rounded-full border ${execMeta.bg}`}>{execMeta.label}</span>
+              </div>
+
+              <div className="p-5 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200"><span className="block text-[10px] text-slate-400">شماره و عنوان جلسه</span><strong className="text-slate-800">{resolution.meetingNumber}</strong><span className="block text-[10px] text-slate-500 mt-0.5">{resolution.meetingTitle}</span></div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200"><span className="block text-[10px] text-slate-400">شماره مصوبه در جلسه</span><strong className="text-slate-800">{toPersianDigits(resolution.meetingResolutionNumber || '—')}</strong></div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200"><span className="block text-[10px] text-slate-400">شماره نامه</span><strong className="text-slate-800">{toPersianDigits(resolution.letterNumber || '—')}</strong></div>
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200"><span className="block text-[10px] text-slate-400">تاریخ و محل جلسه</span><strong className="text-slate-800">{toPersianDigits(meeting?.dateJalali || resolution.assignedDateJalali || '—')}</strong><span className="block text-[10px] text-slate-500 mt-0.5">{meeting?.location || '—'}</span></div>
+                </div>
+
+                <div>
+                  <span className="font-bold text-slate-500">موضوع:</span>
+                  <h5 className="font-extrabold text-slate-900 text-sm mt-1">{resolution.topicTitle}</h5>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-teal-50/60 border border-teal-200">
+                  <span className="font-extrabold text-teal-950 block mb-1">متن کامل مصوبه</span>
+                  <p className="text-slate-700 leading-7">{resolution.executionDescription || resolution.requestDescription}</p>
+                </div>
+
+                <div>
+                  <span className="font-extrabold text-slate-800 block mb-2">مدعوین و مسئولان مرتبط</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {invitees.map((invitee) => (
+                      <div key={invitee.id} className="p-3 rounded-xl border border-slate-200 bg-slate-50">
+                        <strong className="text-slate-800">{invitee.name}</strong>
+                        <span className="block text-[10px] text-slate-500 mt-0.5">{invitee.title}{invitee.department ? ` — ${invitee.department}` : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-3"><PenTool className="w-4 h-4 text-slate-700" /><span className="font-extrabold text-slate-800">امضاهای دیجیتال ترتیبی</span></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {signatureWorkflow.steps.map((step) => {
+                      const statusLabel = step.status === 'SIGNED' ? 'امضا شده' : step.status === 'PENDING' ? 'در انتظار امضا' : 'در انتظار نوبت';
+                      const statusClass = step.status === 'SIGNED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : step.status === 'PENDING' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-500 border-slate-200';
+                      return (
+                        <div key={step.id} className={`p-4 rounded-2xl border ${step.status === 'PENDING' ? 'ring-2 ring-amber-200' : ''} ${statusClass}`}>
+                          <span className="text-[10px] font-bold">امضای {toPersianDigits(step.order)}</span>
+                          <strong className="block text-slate-900 mt-2">{step.signerName}</strong>
+                          <span className="block text-[10px] text-slate-600 mt-0.5">{step.signerTitle}</span>
+                          <span className={`inline-block mt-3 px-2 py-1 rounded-full border text-[10px] font-bold ${statusClass}`}>{statusLabel}</span>
+                          {step.status === 'SIGNED' && <span className="block text-[10px] text-slate-500 mt-2">{toPersianDigits(step.signedDateJalali || '—')}، ساعت {toPersianDigits(step.signedTimeString || '—')}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {signatureWorkflow.status !== 'COMPLETED' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-200">
+                    <span className="text-amber-900 font-bold">
+                      {canSign ? 'نوبت امضای شماست. پس از تأیید، سند به امضاکننده بعدی ارسال می‌شود.' : `در انتظار امضای ${activeSignature?.signerName || 'امضاکننده بعدی'}`}
+                    </span>
+                    {canSign && (
+                      <button type="button" onClick={handleSignResolution} disabled={isSigning} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-extrabold">
+                        <PenTool className="w-4 h-4" />
+                        {isSigning ? 'در حال ثبت امضا...' : 'امضای دیجیتال مصوبه'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {signatureWorkflow.status === 'COMPLETED' && <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-extrabold flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />هر سه امضا تکمیل شده و مصوبه وارد فرآیند اجرا شده است.</div>}
+              </div>
+            </section>
+          )}
           
           {/* Metadata Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

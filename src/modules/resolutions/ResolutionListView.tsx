@@ -127,6 +127,9 @@ export const ResolutionListView: React.FC = () => {
             className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-700"
           >
             <option value="ALL">تمام وضعیت‌های اجرایی</option>
+            <option value="PENDING_OFFICE_SIGNATURE">در انتظار امضای مسئول دفتر</option>
+            <option value="PENDING_CEO_SIGNATURE">در انتظار امضای مدیرعامل</option>
+            <option value="PENDING_ADMIN_SIGNATURE">در انتظار امضای ادمین</option>
             <option value="IN_PROGRESS">در حال انجام (In Progress)</option>
             <option value="PENDING_APPROVAL">در انتظار صحه‌گذاری (Pending Verification)</option>
             <option value="APPROVED_CLOSED">خاتمه یافته و تایید شده (Closed)</option>
@@ -162,6 +165,8 @@ export const ResolutionListView: React.FC = () => {
             const sMeta = getResolutionExecutionMeta(res.executionStatus);
             const pMeta = getPriorityMeta(res.priority);
             const aMeta = getResolutionApprovalMeta(res.approvalStatus);
+            const activeSigner = res.signatureWorkflow?.steps[res.signatureWorkflow.currentStepIndex];
+            const isCurrentUserSignatureTurn = activeSigner?.status === 'PENDING' && activeSigner.signerUserId === currentUser.id;
 
             return (
               <div
@@ -185,7 +190,7 @@ export const ResolutionListView: React.FC = () => {
 
                   <div className="text-xs font-bold text-blue-600 flex items-center gap-1 group-hover:translate-x-[-4px] transition-transform">
                     <Eye className="w-4 h-4" />
-                    <span>بررسی پرونده و صحه‌گذاری</span>
+                    <span>{isCurrentUserSignatureTurn ? 'مشاهده صورت‌جلسه و امضا' : res.signatureWorkflow && res.signatureWorkflow.status !== 'COMPLETED' ? 'مشاهده صورت‌جلسه' : 'بررسی پرونده و صحه‌گذاری'}</span>
                   </div>
                 </div>
 

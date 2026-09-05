@@ -852,7 +852,59 @@ export const mockMeetings: Meeting[] = [
   }
 ];
 
+const createSignatureResolution = (
+  id: string,
+  resolutionNumber: string,
+  meetingResolutionNumber: string,
+  topicTitle: string,
+  executionStatus: Resolution['executionStatus'],
+  signedCount: number
+): Resolution => ({
+  id,
+  resolutionNumber,
+  meetingResolutionNumber,
+  letterNumber: `نامه-۱۴۰۳-${meetingResolutionNumber}`,
+  meetingId: 'meet-1',
+  meetingTitle: 'جلسه شورای راهبری تحول دیجیتال و سامانه‌های یکپارچه',
+  meetingNumber: 'جلسه-۱۴۰۳-۱۴۲',
+  topicTitle,
+  proposerName: 'مهندس پوریا حسینی',
+  proposerDepartment: 'اداره کل فناوری اطلاعات و ارتباطات',
+  requestDescription: 'این نمونه برای نمایش و آزمون فرآیند صورت‌جلسه و امضاهای ترتیبی ایجاد شده است.',
+  reviewResultNotes: 'موضوع در جلسه بررسی و با رأی اعضا تصویب شد.',
+  approvalStatus: 'APPROVED',
+  executionDescription: 'واحد مسئول موظف است پس از تکمیل هر سه امضا، اقدامات اجرایی مصوبه را مطابق برنامه زمان‌بندی آغاز و گزارش کند.',
+  mainResponsibleUserId: 'user-10',
+  mainResponsibleName: 'مهندس آرش کریمی',
+  responsibleDepartmentId: 'dept-1',
+  responsibleDepartmentName: 'اداره کل فناوری اطلاعات و ارتباطات',
+  assignedDateJalali: '۱۴۰۳/۰۶/۱۱',
+  deadlineJalali: '۱۴۰۳/۰۷/۳۰',
+  priority: 'HIGH',
+  executionStatus,
+  referrals: [
+    { id: `ref-${id}-1`, targetType: 'USER', targetId: 'user-10', targetName: 'مهندس آرش کریمی', assignedRole: 'MAIN_RESPONSIBLE', assignedDateJalali: '۱۴۰۳/۰۶/۱۱', deadlineJalali: '۱۴۰۳/۰۷/۳۰' },
+    { id: `ref-${id}-2`, targetType: 'DEPARTMENT', targetId: 'dept-2', targetName: 'معاونت برنامه‌ریزی و تحول سازمانی', assignedRole: 'COOPERATOR', assignedDateJalali: '۱۴۰۳/۰۶/۱۱', deadlineJalali: '۱۴۰۳/۰۷/۲۵' },
+  ],
+  verificationConfig: { requiresVerification: false, mode: 'SEQUENTIAL', currentStepIndex: 0, steps: [] },
+  signatureWorkflow: {
+    status: signedCount === 0 ? 'PENDING_OFFICE_SIGNATURE' : signedCount === 1 ? 'PENDING_CEO_SIGNATURE' : signedCount === 2 ? 'PENDING_ADMIN_SIGNATURE' : 'COMPLETED',
+    currentStepIndex: Math.min(signedCount, 2),
+    steps: [
+      { id: `sig-${id}-1`, signerUserId: 'user-17', signerName: 'مسئول دفتر', signerTitle: 'مسئول دفتر مدیرعامل', signerRole: 'OFFICE_MANAGER', order: 1, status: signedCount >= 1 ? 'SIGNED' : 'PENDING', ...(signedCount >= 1 ? { signedAt: '2024-09-01T08:30:00Z', signedDateJalali: '۱۴۰۳/۰۶/۱۱', signedTimeString: '۱۲:۰۰' } : {}) },
+      { id: `sig-${id}-2`, signerUserId: 'user-16', signerName: 'مدیرعامل', signerTitle: 'مدیرعامل', signerRole: 'CEO', order: 2, status: signedCount >= 2 ? 'SIGNED' : signedCount === 1 ? 'PENDING' : 'WAITING_TURN', ...(signedCount >= 2 ? { signedAt: '2024-09-01T09:00:00Z', signedDateJalali: '۱۴۰۳/۰۶/۱۱', signedTimeString: '۱۲:۳۰' } : {}) },
+      { id: `sig-${id}-3`, signerUserId: 'user-admin', signerName: 'مدیر کل سیستم (Admin)', signerTitle: 'راهبر ارشد سامانه مصوبات', signerRole: 'ADMIN', order: 3, status: signedCount >= 3 ? 'SIGNED' : signedCount === 2 ? 'PENDING' : 'WAITING_TURN', ...(signedCount >= 3 ? { signedAt: '2024-09-01T09:30:00Z', signedDateJalali: '۱۴۰۳/۰۶/۱۱', signedTimeString: '۱۳:۰۰' } : {}) },
+    ],
+  },
+  attachments: [],
+  createdAt: '2024-09-01T08:00:00Z',
+});
+
 export const mockResolutions: Resolution[] = [
+  createSignatureResolution('res-sign-office', 'مصوبه-۱۴۰۳-۱۱۰', '۱', 'راه‌اندازی نسخه آزمایشی داشبورد خدمات دیجیتال', 'PENDING_OFFICE_SIGNATURE', 0),
+  createSignatureResolution('res-sign-ceo', 'مصوبه-۱۴۰۳-۱۱۱', '۲', 'تدوین برنامه ارتقای کیفیت خدمات غیرحضوری', 'PENDING_CEO_SIGNATURE', 1),
+  createSignatureResolution('res-sign-admin', 'مصوبه-۱۴۰۳-۱۱۲', '۳', 'یکپارچه‌سازی گزارش‌های عملکرد واحدهای ستادی', 'PENDING_ADMIN_SIGNATURE', 2),
+  createSignatureResolution('res-sign-complete', 'مصوبه-۱۴۰۳-۱۱۳', '۴', 'به‌روزرسانی زیرساخت پایش سرویس‌های سازمانی', 'IN_PROGRESS', 3),
   {
     id: 'res-1',
     resolutionNumber: 'مصوبه-۱۴۰۳-۹۸',
@@ -1269,6 +1321,25 @@ export const mockResolutions: Resolution[] = [
 ];
 
 export const mockTasks: Task[] = [
+  {
+    id: 'task-sign-complete',
+    resolutionId: 'res-sign-complete',
+    resolutionNumber: 'مصوبه-۱۴۰۳-۱۱۳',
+    resolutionTitle: 'به‌روزرسانی زیرساخت پایش سرویس‌های سازمانی',
+    meetingId: 'meet-1',
+    meetingTitle: 'جلسه شورای راهبری تحول دیجیتال و سامانه‌های یکپارچه',
+    assignedToUserId: 'user-10',
+    assignedToName: 'مهندس آرش کریمی',
+    departmentId: 'dept-1',
+    departmentName: 'اداره کل فناوری اطلاعات و ارتباطات',
+    referralDateJalali: '۱۴۰۳/۰۶/۱۱',
+    deadlineJalali: '۱۴۰۳/۰۷/۳۰',
+    priority: 'HIGH',
+    status: 'IN_PROGRESS',
+    requiresVerification: false,
+    instructions: 'هر سه امضا تکمیل شده است؛ اقدامات اجرایی مطابق برنامه زمان‌بندی آغاز شود.',
+    attachments: [],
+  },
   {
     id: 'task-1',
     resolutionId: 'res-1',

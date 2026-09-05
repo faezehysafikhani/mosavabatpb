@@ -40,6 +40,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
   const [selectedMeetingId, setSelectedMeetingId] = useState(defaultMeetingId || '');
   const [selectedAgendaItemId, setSelectedAgendaItemId] = useState(defaultAgendaItemId || '');
   const [topicTitle, setTopicTitle] = useState(defaultTopicTitle || '');
+  const [letterNumber, setLetterNumber] = useState('');
   const [proposerName, setProposerName] = useState('');
   const [proposerDepartment, setProposerDepartment] = useState('');
   const [requestDescription, setRequestDescription] = useState('');
@@ -69,6 +70,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
       setSelectedMeetingId(defaultMeetingId || '');
       setSelectedAgendaItemId(defaultAgendaItemId || '');
       setTopicTitle(defaultTopicTitle || '');
+      setLetterNumber('');
       setProposerName('');
       setProposerDepartment('');
       setRequestDescription('');
@@ -147,6 +149,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
         agendaItemId: selectedAgendaItemId || undefined,
         agendaItemTitle: defaultTopicTitle || undefined,
         topicTitle: topicTitle.trim(),
+        letterNumber: letterNumber.trim() || undefined,
         proposerName,
         proposerDepartment,
         requestDescription,
@@ -165,7 +168,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
       });
 
       if (res.isSuccess) {
-        showToast('ثبت موفق مصوبه', `مصوبه با شماره ${res.data.resolutionNumber} با موفقیت ثبت و ابلاغ شد.`, 'success');
+        showToast('ثبت موفق مصوبه', `مصوبه با شماره ${res.data.resolutionNumber} ثبت و برای امضاهای ترتیبی ارسال شد.`, 'success');
         triggerRefresh();
         onClose();
       }
@@ -243,7 +246,7 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                   onChange={(e) => setApprovalStatus(e.target.value as ResolutionApprovalStatus)}
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold text-teal-900"
                 >
-                  <option value="APPROVED">مصوب و ابلاغ جهت اجرا (Approved)</option>
+                  <option value="APPROVED">مصوب و ارسال برای امضا (Approved)</option>
                   <option value="CONDITIONAL_APPROVED">مصوب مشروط (Conditional)</option>
                   <option value="REFERRED_FOR_REVIEW">ارجاع مجدد جهت بازبینی و اصلاح</option>
                   <option value="REJECTED">رد شده / عدم تصویب (Rejected)</option>
@@ -261,6 +264,17 @@ export const CreateResolutionModal: React.FC<CreateResolutionModalProps> = ({
                   onChange={(e) => setTopicTitle(e.target.value)}
                   placeholder="مثال: استقرار زیرساخت احراز هویت مرکزی (SSO) سازمانی"
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">شماره نامه مربوطه</label>
+                <input
+                  type="text"
+                  value={letterNumber}
+                  onChange={(e) => setLetterNumber(e.target.value)}
+                  placeholder="مثال: ۱۲۳۴/الف"
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
                 />
               </div>
 

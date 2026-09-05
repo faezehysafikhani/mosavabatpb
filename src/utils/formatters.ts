@@ -109,6 +109,12 @@ export function getResolutionApprovalMeta(status: ResolutionApprovalStatus): { l
  */
 export function getResolutionExecutionMeta(status: ResolutionExecutionStatus): { label: string; bg: string; text: string; dot: string } {
   switch (status) {
+    case 'PENDING_OFFICE_SIGNATURE':
+      return { label: 'در انتظار امضای مسئول دفتر', bg: 'bg-amber-50 text-amber-700 border-amber-200', text: 'text-amber-700', dot: 'bg-amber-500' };
+    case 'PENDING_CEO_SIGNATURE':
+      return { label: 'در انتظار امضای مدیرعامل', bg: 'bg-violet-50 text-violet-700 border-violet-200', text: 'text-violet-700', dot: 'bg-violet-500' };
+    case 'PENDING_ADMIN_SIGNATURE':
+      return { label: 'در انتظار امضای ادمین', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200', text: 'text-cyan-700', dot: 'bg-cyan-500' };
     case 'APPROVED_CLOSED':
       return { label: 'مختومه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-500' };
     case 'PENDING_APPROVAL':
