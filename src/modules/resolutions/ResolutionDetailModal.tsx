@@ -359,6 +359,16 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
             </div>
           </div>
 
+          {(resolution.progressReports?.length || resolution.progressPercent !== undefined) && (
+            <section className="p-5 bg-white border border-slate-200 rounded-3xl space-y-4">
+              <div className="flex items-center justify-between"><h4 className="font-extrabold text-slate-900">پیگیری پیشرفت اجرای مصوبه</h4><span className="text-sm font-black text-teal-700">{toPersianDigits(resolution.progressPercent || 0)}٪</span></div>
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${resolution.progressPercent || 0}%` }} /></div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px]"><div className="p-3 bg-slate-50 rounded-xl"><span className="text-slate-400 block">تاریخ شروع</span><strong>{toPersianDigits(resolution.executionStartDateJalali || '—')}</strong></div><div className="p-3 bg-slate-50 rounded-xl sm:col-span-2"><span className="text-slate-400 block">آخرین اقدام</span><strong>{resolution.lastAction || '—'}</strong></div></div>
+              {resolution.obstacles && <div className="p-3 bg-orange-50 border border-orange-200 text-orange-800 rounded-xl"><strong>مشکلات و موانع:</strong> {resolution.obstacles}</div>}
+              <div className="space-y-2"><div className="font-bold text-slate-700">گزارش‌های ثبت‌شده</div>{[...(resolution.progressReports || [])].reverse().map((report) => <div key={report.id} className="p-3 border border-slate-200 rounded-2xl bg-slate-50"><div className="flex flex-wrap justify-between gap-2"><strong className="text-slate-800">{toPersianDigits(report.progressPercent)}٪ — {report.reporterName}</strong><span className="text-slate-400">{toPersianDigits(report.reportDateJalali)}، {toPersianDigits(report.reportTimeString)}</span></div><p className="mt-1 text-slate-700">{report.actionDescription}</p>{report.obstacles && <p className="mt-1 text-orange-700">موانع: {report.obstacles}</p>}{report.attachments.length > 0 && <span className="block mt-1 text-blue-700">{toPersianDigits(report.attachments.length)} مستند پیوست</span>}</div>)}</div>
+            </section>
+          )}
+
           {/* Texts & Instructions */}
           <div className="space-y-3">
             <div className="p-4 bg-teal-50/40 border border-teal-200/70 rounded-2xl space-y-1">
@@ -437,7 +447,7 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
           )}
 
           {/* Interactive Form 1: Complete task by Assignee */}
-          {isAssignee && (resolution.executionStatus === 'IN_PROGRESS' || resolution.executionStatus === 'REJECTED_RETURNED') && (
+          {isAssignee && ['IN_PROGRESS', 'WAITING_RESPONSE', 'NEEDS_FOLLOW_UP', 'OVERDUE', 'REJECTED_RETURNED'].includes(resolution.executionStatus) && (
             <div className="p-5 bg-teal-50/60 border border-teal-300 rounded-3xl space-y-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-teal-700" />

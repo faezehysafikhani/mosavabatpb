@@ -131,6 +131,10 @@ export function getResolutionExecutionMeta(status: ResolutionExecutionStatus): {
       return { label: 'در انتظار صحه‌گذاری', bg: 'bg-yellow-50 text-yellow-700 border-yellow-200', text: 'text-yellow-700', dot: 'bg-yellow-500' };
     case 'IN_PROGRESS':
       return { label: 'در حال انجام توسط مجری', bg: 'bg-blue-50 text-blue-700 border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500' };
+    case 'WAITING_RESPONSE':
+      return { label: 'در انتظار پاسخ', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200', text: 'text-cyan-700', dot: 'bg-cyan-500' };
+    case 'NEEDS_FOLLOW_UP':
+      return { label: 'نیازمند پیگیری', bg: 'bg-orange-50 text-orange-700 border-orange-200', text: 'text-orange-700', dot: 'bg-orange-500' };
     case 'DONE_BY_ASSIGNEE':
       return { label: 'اتمام توسط مجری', bg: 'bg-blue-50 text-blue-800 border-blue-200', text: 'text-blue-800', dot: 'bg-blue-500' };
     case 'OVERDUE':
@@ -169,6 +173,10 @@ export function getTaskStatusMeta(status: string): { label: string; bg: string; 
       return { label: 'جدید', bg: 'bg-slate-100 text-slate-700 border-slate-200', text: 'text-slate-700' };
     case 'IN_PROGRESS':
       return { label: 'در حال انجام', bg: 'bg-blue-50 text-blue-700 border-blue-200', text: 'text-blue-700' };
+    case 'WAITING_RESPONSE':
+      return { label: 'در انتظار پاسخ', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200', text: 'text-cyan-700' };
+    case 'NEEDS_FOLLOW_UP':
+      return { label: 'نیازمند پیگیری', bg: 'bg-orange-50 text-orange-700 border-orange-200', text: 'text-orange-700' };
     case 'COMPLETED':
       return { label: 'انجام شده', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'text-emerald-700' };
     case 'PENDING_APPROVAL':

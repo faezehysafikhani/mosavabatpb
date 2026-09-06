@@ -1,4 +1,4 @@
-import { Task, ApiResponse, ApiFilterParams, PagedResult } from '../types';
+import { Task, ApiResponse, ApiFilterParams, PagedResult, User, Attachment, ResolutionProgressReport } from '../types';
 import { mockTasks } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { resolutionService } from './resolutionService';
@@ -9,6 +9,7 @@ export interface ITaskService {
   getTaskById(id: string): Promise<ApiResponse<Task | null>>;
   submitTaskCompletion(taskId: string, completionNotes: string, attachments?: Task['attachments']): Promise<ApiResponse<Task>>;
   updateTaskStatus(taskId: string, status: Task['status']): Promise<ApiResponse<Task>>;
+  submitProgressReport(taskId: string, dto: { progressPercent: number; status: ResolutionProgressReport['status']; actionDescription: string; obstacles?: string; attachments?: Attachment[] }, actor: User): Promise<ApiResponse<Task>>;
 }
 
 class MockTaskService implements ITaskService {
@@ -91,6 +92,42 @@ class MockTaskService implements ITaskService {
     tasks[taskIndex].status = status;
     saveLocalCollection('tasks', tasks);
     return apiClient.simulateNetwork(tasks[taskIndex], 120);
+  }
+
+  public async submitProgressReport(taskId: string, dto: { progressPercent: number; status: ResolutionProgressReport['status']; actionDescription: string; obstacles?: string; attachments?: Attachment[] }, actor: User): Promise<ApiResponse<Task>> {
+    const tasks = this.getTasksData();
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) throw new Error('وظیفه یافت نشد');
+    if (task.assignedToUserId !== actor.id && actor.role !== 'ADMIN') throw new Error('فقط مسئول اجرای این مصوبه می‌تواند گزارش پیشرفت ثبت کند');
+    if (!['NEW', 'IN_PROGRESS', 'WAITING_RESPONSE', 'NEEDS_FOLLOW_UP', 'RETURNED', 'OVERDUE'].includes(task.status)) throw new Error('وضعیت فعلی وظیفه امکان ثبت گزارش پیشرفت ندارد');
+    if (!Number.isFinite(dto.progressPercent) || dto.progressPercent < 0 || dto.progressPercent > 100) throw new Error('درصد پیشرفت باید بین صفر تا صد باشد');
+    if (!dto.actionDescription.trim()) throw new Error('شرح آخرین اقدام الزامی است');
+    const now = new Date();
+    const reportDateJalali = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now).replace(/[\u200e\u200f]/g, '');
+    const report: ResolutionProgressReport = {
+      id: `progress-${Date.now()}`,
+      taskId: task.id,
+      resolutionId: task.resolutionId,
+      reporterUserId: actor.id,
+      reporterName: actor.fullName,
+      progressPercent: dto.progressPercent,
+      status: dto.status,
+      actionDescription: dto.actionDescription.trim(),
+      obstacles: dto.obstacles?.trim(),
+      reportDateJalali,
+      reportTimeString: now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+      attachments: dto.attachments || [],
+    };
+    await resolutionService.updateExecutionProgress(task.resolutionId, report);
+    task.executionStartDateJalali = task.executionStartDateJalali || reportDateJalali;
+    task.progressPercent = report.progressPercent;
+    task.lastAction = report.actionDescription;
+    task.obstacles = report.obstacles;
+    task.progressReports = [...(task.progressReports || []), report];
+    task.status = report.status;
+    if (report.attachments.length > 0) task.attachments = [...task.attachments, ...report.attachments];
+    saveLocalCollection('tasks', tasks);
+    return apiClient.simulateNetwork(task, 160);
   }
 }
 

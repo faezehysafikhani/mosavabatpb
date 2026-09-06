@@ -10,7 +10,9 @@ import {
   CheckCircle2, 
   AlertTriangle,
   FileText,
-  User
+  User,
+  TrendingUp,
+  Paperclip
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { taskService } from '../../services/taskService';
@@ -35,6 +37,12 @@ export const MyTasksView: React.FC = () => {
   const [activeCompletingTask, setActiveCompletingTask] = useState<Task | null>(null);
   const [completionNotes, setCompletionNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeProgressTask, setActiveProgressTask] = useState<Task | null>(null);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressStatus, setProgressStatus] = useState<'IN_PROGRESS' | 'WAITING_RESPONSE' | 'NEEDS_FOLLOW_UP' | 'OVERDUE'>('IN_PROGRESS');
+  const [progressAction, setProgressAction] = useState('');
+  const [progressObstacles, setProgressObstacles] = useState('');
+  const [progressFiles, setProgressFiles] = useState<File[]>([]);
 
   useEffect(() => {
     fetchTasks();
@@ -92,10 +100,36 @@ export const MyTasksView: React.FC = () => {
     }
   };
 
+  const handleOpenProgressModal = (e: React.MouseEvent, task: Task) => {
+    e.stopPropagation();
+    setActiveProgressTask(task);
+    setProgressPercent(task.progressPercent || 0);
+    setProgressStatus(['WAITING_RESPONSE', 'NEEDS_FOLLOW_UP', 'OVERDUE'].includes(task.status) ? task.status as typeof progressStatus : 'IN_PROGRESS');
+    setProgressAction(''); setProgressObstacles(task.obstacles || ''); setProgressFiles([]);
+  };
+
+  const handleSubmitProgress = async () => {
+    if (!activeProgressTask) return;
+    setIsSubmitting(true);
+    try {
+      const now = new Date();
+      const uploadDate = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(now).replace(/[\u200e\u200f]/g, '');
+      const attachments = progressFiles.map((file, index) => ({ id: `progress-attachment-${Date.now()}-${index}`, fileName: file.name, fileSizeBytes: file.size, fileExtension: file.name.split('.').pop() || 'file', uploadDate, uploadedBy: currentUser.fullName, downloadUrl: '#' }));
+      await taskService.submitProgressReport(activeProgressTask.id, { progressPercent, status: progressStatus, actionDescription: progressAction, obstacles: progressObstacles, attachments }, currentUser);
+      showToast('گزارش پیشرفت', 'گزارش پیشرفت ذخیره و به پرونده مصوبه و Timeline افزوده شد.', 'success');
+      setActiveProgressTask(null); await fetchTasks();
+    } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'گزارش ذخیره نشد.', 'error'); }
+    finally { setIsSubmitting(false); }
+  };
+
   const getTaskStatusBadge = (status: Task['status']) => {
     switch (status) {
       case 'IN_PROGRESS':
         return { label: 'در حال اقدام', bg: 'bg-blue-50 text-blue-700 border-blue-200' };
+      case 'WAITING_RESPONSE':
+        return { label: 'در انتظار پاسخ', bg: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
+      case 'NEEDS_FOLLOW_UP':
+        return { label: 'نیازمند پیگیری', bg: 'bg-orange-50 text-orange-700 border-orange-200' };
       case 'PENDING_APPROVAL':
         return { label: 'در انتظار صحه‌گذاری', bg: 'bg-purple-50 text-purple-700 border-purple-200' };
       case 'RETURNED':
@@ -159,6 +193,9 @@ export const MyTasksView: React.FC = () => {
           >
             <option value="ALL">تمام وظایف</option>
             <option value="IN_PROGRESS">در حال اقدام (In Progress)</option>
+            <option value="WAITING_RESPONSE">در انتظار پاسخ</option>
+            <option value="NEEDS_FOLLOW_UP">نیازمند پیگیری</option>
+            <option value="OVERDUE">دارای تأخیر</option>
             <option value="PENDING_APPROVAL">ارسال‌شده جهت صحه‌گذاری (Pending Approval)</option>
             <option value="RETURNED">بازگشتی به دلیل عدم تایید (Returned)</option>
             <option value="CLOSED">خاتمه یافته (Closed)</option>
@@ -178,7 +215,7 @@ export const MyTasksView: React.FC = () => {
           tasks.map((task) => {
             const pMeta = getPriorityMeta(task.priority);
             const statusBadge = getTaskStatusBadge(task.status);
-            const canComplete = task.status === 'IN_PROGRESS' || task.status === 'RETURNED' || task.status === 'NEW';
+            const canComplete = ['IN_PROGRESS', 'WAITING_RESPONSE', 'NEEDS_FOLLOW_UP', 'RETURNED', 'NEW', 'OVERDUE'].includes(task.status);
 
             return (
               <div
@@ -200,13 +237,13 @@ export const MyTasksView: React.FC = () => {
                   </div>
 
                   {canComplete && (
-                    <button
+                    <div className="flex flex-wrap gap-2"><button onClick={(e) => handleOpenProgressModal(e, task)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs py-1.5 px-3.5 rounded-full shadow-xs transition-colors flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /><span>ثبت پیشرفت</span></button><button
                       onClick={(e) => handleOpenCompleteModal(e, task)}
                       className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-full shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>ثبت اتمام وظیفه</span>
-                    </button>
+                    </button></div>
                   )}
                 </div>
 
@@ -227,6 +264,8 @@ export const MyTasksView: React.FC = () => {
                   </div>
                 )}
 
+                <div className="space-y-1.5"><div className="flex items-center justify-between text-[11px] font-bold text-slate-600"><span>پیشرفت اجرای مصوبه</span><span>{toPersianDigits(task.progressPercent || 0)}٪</span></div><div className="h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${task.progressPercent || 0}%` }} /></div>{task.lastAction && <div className="text-[11px] text-slate-600">آخرین اقدام: {task.lastAction}</div>}{task.obstacles && <div className="text-[11px] text-orange-700">موانع: {task.obstacles}</div>}</div>
+
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-2 border-t border-slate-100">
                   <div>تاریخ ارجاع: {toPersianDigits(task.referralDateJalali)}</div>
                   <div>مهلت اقدام: <strong className="text-slate-700">{toPersianDigits(task.deadlineJalali)}</strong></div>
@@ -244,16 +283,29 @@ export const MyTasksView: React.FC = () => {
         )}
       </div> : (
         <div className="app-panel bg-white rounded-2xl border border-slate-100 shadow-xs overflow-x-auto">
-          <table className="w-full min-w-[850px] text-xs text-right">
-            <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">شماره</th><th className="p-3">عنوان وظیفه</th><th className="p-3">جلسه</th><th className="p-3">مهلت</th><th className="p-3">اولویت</th><th className="p-3">وضعیت</th></tr></thead>
+          <table className="w-full min-w-[1000px] text-xs text-right">
+            <thead className="bg-slate-100 text-slate-600"><tr><th className="p-3">شماره</th><th className="p-3">عنوان وظیفه</th><th className="p-3">جلسه</th><th className="p-3">مهلت</th><th className="p-3">پیشرفت</th><th className="p-3">اولویت</th><th className="p-3">وضعیت</th><th className="p-3">عملیات</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {tasks.map((task) => { const status = getTaskStatusBadge(task.status); return <tr key={task.id} onClick={() => setSelectedResolutionId(task.resolutionId)} className="hover:bg-slate-50 cursor-pointer transition-colors"><td className="p-3 font-bold text-blue-700">{task.resolutionNumber}</td><td className="p-3 font-bold text-slate-800">{task.resolutionTitle}</td><td className="p-3 text-slate-600">{task.meetingTitle}</td><td className="p-3">{toPersianDigits(task.deadlineJalali)}</td><td className="p-3">{getPriorityMeta(task.priority).label}</td><td className="p-3"><span className={`px-2 py-1 rounded-full border font-bold ${status.bg}`}>{status.label}</span></td></tr>; })}
+              {tasks.map((task) => { const status = getTaskStatusBadge(task.status); const canReport = ['IN_PROGRESS', 'WAITING_RESPONSE', 'NEEDS_FOLLOW_UP', 'RETURNED', 'NEW', 'OVERDUE'].includes(task.status); return <tr key={task.id} onClick={() => setSelectedResolutionId(task.resolutionId)} className="hover:bg-slate-50 cursor-pointer transition-colors"><td className="p-3 font-bold text-blue-700">{task.resolutionNumber}</td><td className="p-3 font-bold text-slate-800">{task.resolutionTitle}</td><td className="p-3 text-slate-600">{task.meetingTitle}</td><td className="p-3">{toPersianDigits(task.deadlineJalali)}</td><td className="p-3"><div className="w-24"><div className="flex justify-between text-[10px] mb-1"><span>{toPersianDigits(task.progressPercent || 0)}٪</span></div><div className="h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-teal-600" style={{ width: `${task.progressPercent || 0}%` }} /></div></div></td><td className="p-3">{getPriorityMeta(task.priority).label}</td><td className="p-3"><span className={`px-2 py-1 rounded-full border font-bold ${status.bg}`}>{status.label}</span></td><td className="p-3">{canReport && <button onClick={(event) => handleOpenProgressModal(event, task)} className="px-3 py-1.5 bg-teal-700 text-white rounded-lg font-bold">ثبت پیشرفت</button>}</td></tr>; })}
             </tbody>
           </table>
         </div>
       )}
 
       {/* Completion Modal */}
+      {activeProgressTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-xl w-full p-5 space-y-4">
+            <div><h3 className="text-sm font-extrabold text-slate-800">ثبت گزارش پیشرفت: {activeProgressTask.resolutionNumber}</h3><p className="text-[11px] text-slate-500 mt-1">هر گزارش با نام شما، تاریخ و ساعت در سابقه مصوبه ذخیره می‌شود.</p></div>
+            <div><label className="text-xs font-bold text-slate-700">درصد پیشرفت: {toPersianDigits(progressPercent)}٪</label><input type="range" min="0" max="100" step="5" value={progressPercent} onChange={(e) => setProgressPercent(Number(e.target.value))} className="w-full accent-teal-700 mt-2" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="block text-xs font-bold text-slate-700 mb-1">وضعیت پیگیری</label><select value={progressStatus} onChange={(e) => setProgressStatus(e.target.value as typeof progressStatus)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"><option value="IN_PROGRESS">در حال اقدام</option><option value="WAITING_RESPONSE">در انتظار پاسخ</option><option value="NEEDS_FOLLOW_UP">نیازمند پیگیری دبیرخانه</option><option value="OVERDUE">دارای تأخیر</option></select></div><div><label className="block text-xs font-bold text-slate-700 mb-1">مستندات</label><label className="flex items-center gap-2 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer"><Paperclip className="w-4 h-4" /><span>{progressFiles.length ? `${toPersianDigits(progressFiles.length)} فایل انتخاب شد` : 'انتخاب فایل‌ها'}</span><input type="file" multiple className="hidden" onChange={(e) => setProgressFiles(Array.from(e.target.files || []))} /></label></div></div>
+            <div><label className="block text-xs font-bold text-slate-700 mb-1">شرح آخرین اقدام *</label><textarea rows={3} value={progressAction} onChange={(e) => setProgressAction(e.target.value)} placeholder="اقدامات انجام‌شده از گزارش قبلی تا امروز" className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl" /></div>
+            <div><label className="block text-xs font-bold text-slate-700 mb-1">مشکلات و موانع</label><textarea rows={2} value={progressObstacles} onChange={(e) => setProgressObstacles(e.target.value)} placeholder="وابستگی‌ها، کمبود منابع یا پاسخ‌های در انتظار" className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl" /></div>
+            <div className="flex justify-end gap-2"><button onClick={() => setActiveProgressTask(null)} className="px-4 py-2 text-xs font-bold text-slate-600">انصراف</button><button onClick={handleSubmitProgress} disabled={isSubmitting} className="px-5 py-2 bg-teal-700 text-white rounded-xl text-xs font-bold">{isSubmitting ? 'در حال ذخیره...' : 'ثبت گزارش پیشرفت'}</button></div>
+          </div>
+        </div>
+      )}
+
       {activeCompletingTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-5 space-y-4">

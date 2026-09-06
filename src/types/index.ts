@@ -312,6 +312,8 @@ export type ResolutionExecutionStatus =
   | 'PENDING_ADMIN_SIGNATURE'  // در انتظار امضای ادمین
   | 'NOT_STARTED'       // شروع نشده
   | 'IN_PROGRESS'       // در حال انجام
+  | 'WAITING_RESPONSE'  // در انتظار پاسخ یا همکاری
+  | 'NEEDS_FOLLOW_UP'   // نیازمند پیگیری دبیرخانه
   | 'DONE_BY_ASSIGNEE'  // انجام شده توسط مسئول
   | 'PENDING_APPROVAL'  // در انتظار صحه‌گذاری
   | 'APPROVED_CLOSED'   // تایید نهایی و خاتمه‌یافته
@@ -412,7 +414,27 @@ export interface Resolution {
   attachments: Attachment[];
   completionNotes?: string;
   completionDateJalali?: string;
+  executionStartDateJalali?: string;
+  progressPercent?: number;
+  lastAction?: string;
+  obstacles?: string;
+  progressReports?: ResolutionProgressReport[];
   createdAt: string;
+}
+
+export interface ResolutionProgressReport {
+  id: string;
+  taskId: string;
+  resolutionId: string;
+  reporterUserId: string;
+  reporterName: string;
+  progressPercent: number;
+  status: 'IN_PROGRESS' | 'WAITING_RESPONSE' | 'NEEDS_FOLLOW_UP' | 'OVERDUE';
+  actionDescription: string;
+  obstacles?: string;
+  reportDateJalali: string;
+  reportTimeString: string;
+  attachments: Attachment[];
 }
 
 export interface Task {
@@ -429,13 +451,18 @@ export interface Task {
   referralDateJalali: string;
   deadlineJalali: string;
   priority: PriorityLevel;
-  status: 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'PENDING_APPROVAL' | 'CLOSED' | 'RETURNED' | 'OVERDUE';
+  status: 'NEW' | 'IN_PROGRESS' | 'WAITING_RESPONSE' | 'NEEDS_FOLLOW_UP' | 'COMPLETED' | 'PENDING_APPROVAL' | 'CLOSED' | 'RETURNED' | 'OVERDUE';
   requiresVerification: boolean;
   verificationCurrentStepTitle?: string;
   instructions: string;
   completionNotes?: string;
   completionDateJalali?: string;
   rejectionReason?: string;
+  executionStartDateJalali?: string;
+  progressPercent?: number;
+  lastAction?: string;
+  obstacles?: string;
+  progressReports?: ResolutionProgressReport[];
   attachments: Attachment[];
 }
 

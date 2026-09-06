@@ -10,6 +10,7 @@ import {
   ApiFilterParams, 
   PagedResult 
 } from '../types';
+import type { ResolutionProgressReport } from '../types';
 import { mockResolutions, mockActivityLogs, mockTasks, mockApprovals } from '../mock/data';
 import { apiClient } from './api/apiClient';
 import { mockUsers } from '../mock/data';
@@ -55,6 +56,7 @@ export interface IResolutionService {
   approveVerificationStep(resolutionId: string, stepNumber: number, comments: string, approverName: string): Promise<ApiResponse<Resolution>>;
   rejectVerificationStep(resolutionId: string, stepNumber: number, rejectionReason: string, approverName: string): Promise<ApiResponse<Resolution>>;
   signResolution(resolutionId: string, signerUserId: string): Promise<ApiResponse<Resolution>>;
+  updateExecutionProgress(resolutionId: string, report: ResolutionProgressReport): Promise<ApiResponse<Resolution>>;
 }
 
 class MockResolutionService implements IResolutionService {
@@ -314,6 +316,34 @@ class MockResolutionService implements IResolutionService {
     this.resolutions[index] = { ...this.resolutions[index], ...dto };
     this.persist();
     return apiClient.simulateNetwork(this.resolutions[index], 150);
+  }
+
+  public async updateExecutionProgress(resolutionId: string, report: ResolutionProgressReport): Promise<ApiResponse<Resolution>> {
+    const resolution = this.resolutions.find((item) => item.id === resolutionId);
+    if (!resolution) throw new Error('مصوبه یافت نشد');
+    if (resolution.signatureWorkflow && resolution.signatureWorkflow.status !== 'COMPLETED') throw new Error('ثبت پیشرفت پیش از تکمیل امضاهای مصوبه مجاز نیست');
+    if (['APPROVED_CLOSED', 'PENDING_APPROVAL'].includes(resolution.executionStatus)) throw new Error('برای مصوبه خاتمه‌یافته یا در حال صحه‌گذاری نمی‌توان گزارش پیشرفت ثبت کرد');
+    resolution.executionStartDateJalali = resolution.executionStartDateJalali || report.reportDateJalali;
+    resolution.progressPercent = report.progressPercent;
+    resolution.lastAction = report.actionDescription;
+    resolution.obstacles = report.obstacles;
+    resolution.progressReports = [...(resolution.progressReports || []), report];
+    resolution.executionStatus = report.status;
+    if (report.attachments.length > 0) resolution.attachments = [...resolution.attachments, ...report.attachments];
+    this.activityLogs.unshift({
+      id: `log-progress-${Date.now()}`,
+      targetType: 'RESOLUTION',
+      targetId: resolution.id,
+      action: `ثبت گزارش پیشرفت ${report.progressPercent} درصدی`,
+      actorName: report.reporterName,
+      actorRole: 'مسئول اجرای مصوبه',
+      timestampJalali: report.reportDateJalali,
+      timeString: report.reportTimeString,
+      details: `${report.actionDescription}${report.obstacles ? ` | موانع: ${report.obstacles}` : ''}`,
+      badgeColor: report.status === 'OVERDUE' ? 'red' : report.status === 'NEEDS_FOLLOW_UP' ? 'amber' : 'blue',
+    });
+    this.persist();
+    return apiClient.simulateNetwork(resolution, 140);
   }
 
   public async deleteResolution(id: string): Promise<ApiResponse<boolean>> {
