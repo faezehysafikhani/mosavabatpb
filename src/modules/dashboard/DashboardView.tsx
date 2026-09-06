@@ -19,10 +19,9 @@ import {
   ResponsiveContainer, 
   PieChart, 
   Pie, 
-  Cell, 
-  Tooltip, 
-  Legend, 
-  BarChart, 
+  Cell,
+  Tooltip,
+  BarChart,
   Bar, 
   XAxis, 
   YAxis 
@@ -34,6 +33,23 @@ import { toPersianDigits, getResolutionExecutionMeta, getPriorityMeta } from '..
 import { mockDepartments } from '../../mock/data';
 
 const CHART_PALETTE = ['#10b981', '#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#0ea5e9', '#ef4444'];
+
+// Truncates long category labels on a vertical bar chart's axis so they never
+// spill into the plot area and overlap the bars; the full label is still
+// available on hover via the native <title> tooltip.
+const renderAxisTick = (maxChars: number) => (props: { x?: number; y?: number; payload?: { value?: string | number } }) => {
+  const label = String(props.payload?.value ?? '');
+  const truncated = label.length > maxChars ? `${label.slice(0, maxChars - 1)}…` : label;
+  return (
+    // The page is RTL; without a forced ltr direction here, the browser
+    // flips what "end" anchors to and the label grows into the bars instead
+    // of away from them (verified by measuring rendered tick/bar rects).
+    <text x={props.x} y={props.y} dy={4} textAnchor="end" direction="ltr" fontSize={10} fill="#666">
+      {truncated}
+      {truncated !== label && <title>{label}</title>}
+    </text>
+  );
+};
 
 export const DashboardView: React.FC = () => {
   const { navigateTo, setIsCreateMeetingOpen, currentUser, refreshTrigger, hasPermission } = useApp();
@@ -249,9 +265,9 @@ export const DashboardView: React.FC = () => {
               </ResponsiveContainer>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={statusData} layout="vertical">
+                <BarChart data={statusData} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={108} tick={renderAxisTick(12)} />
                   <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
                   <Bar dataKey="value" fill="#2563eb" radius={[0, 6, 6, 0]} />
                 </BarChart>
@@ -333,6 +349,17 @@ export const DashboardView: React.FC = () => {
             </div>
           )}
 
+          {chart2Mode === 'donut' && departmentData.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2 text-[11px] text-slate-600 font-medium">
+              {departmentData.map((dept) => (
+                <div key={dept.name} className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dept.color }}></span>
+                  <span>{dept.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="text-center pt-2 text-[10px] text-slate-400">
             {rankedDeptPerf.length > 0
               ? `بیشترین تمرکز مصوبات روی ${rankedDeptPerf[0].departmentName} است`
@@ -380,9 +407,9 @@ export const DashboardView: React.FC = () => {
                   <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
                 </PieChart>
               ) : (
-                <BarChart data={managerData} layout="vertical">
+                <BarChart data={managerData} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 0 }}>
                   <XAxis type="number" hide />
-                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" width={132} tick={renderAxisTick(15)} />
                   <Tooltip formatter={(val) => [toPersianDigits(Number(val)), 'تعداد']} />
                   <Bar dataKey="value" radius={[0, 6, 6, 0]}>
                     {managerData.map((entry, index) => (

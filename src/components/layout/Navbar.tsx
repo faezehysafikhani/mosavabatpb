@@ -47,7 +47,6 @@ export const Navbar: React.FC = () => {
   } = useApp();
 
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notificationTab, setNotificationTab] = useState<'ALL' | 'UNREAD'>('ALL');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -140,9 +139,14 @@ export const Navbar: React.FC = () => {
     setGlobalSearch('');
   };
 
-  const filteredNotifications = notifications.filter((n) => {
-    if (notificationTab === 'UNREAD') return !n.isRead;
-    return true;
+  // Single unified list, newest first. dateJalali/timeString are zero-padded
+  // Persian-digit strings (e.g. "۱۴۰۳/۰۶/۱۱", "۰۹:۱۵"), and Persian digits are
+  // sequential Unicode code points, so plain string comparison on the
+  // concatenated key sorts them chronologically without needing a parser.
+  const sortedNotifications = [...notifications].sort((a, b) => {
+    const keyA = `${a.dateJalali} ${a.timeString}`;
+    const keyB = `${b.dateJalali} ${b.timeString}`;
+    return keyA < keyB ? 1 : keyA > keyB ? -1 : 0;
   });
 
   const handleNotificationClick = (notif: typeof notifications[0]) => {
@@ -374,46 +378,24 @@ export const Navbar: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 text-[11px] font-bold">
-                  <button
-                    onClick={() => setNotificationTab('ALL')}
-                    className={`flex-1 py-1 rounded-lg transition-all cursor-pointer ${
-                      notificationTab === 'ALL'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
-                    }`}
-                  >
-                    همه ({toPersianDigits(notifications.length)})
-                  </button>
-                  <button
-                    onClick={() => setNotificationTab('UNREAD')}
-                    className={`flex-1 py-1 rounded-lg transition-all cursor-pointer ${
-                      notificationTab === 'UNREAD'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-800'
-                    }`}
-                  >
-                    خوانده‌نشده ({toPersianDigits(unreadNotificationsCount)})
-                  </button>
-                </div>
-
-                {/* Notification List */}
+                {/* Notification List — a single unified list (no read/unread
+                    tabs), newest first; unread items get a soft highlighted
+                    background, seen items look normal but stay in the list. */}
                 <div className="max-h-72 overflow-y-auto space-y-1.5 pr-0.5">
-                  {filteredNotifications.length === 0 ? (
+                  {sortedNotifications.length === 0 ? (
                     <div className="text-center py-8 space-y-2 text-slate-400 dark:text-slate-500">
                       <Inbox className="w-7 h-7 mx-auto opacity-40" />
-                      <p className="text-xs font-medium">اعلانی در این بخش وجود ندارد</p>
+                      <p className="text-xs font-medium">اعلانی وجود ندارد</p>
                     </div>
                   ) : (
-                    filteredNotifications.map((notif) => (
+                    sortedNotifications.map((notif) => (
                       <div
                         key={notif.id}
                         onClick={() => handleNotificationClick(notif)}
                         className={`p-2.5 rounded-2xl text-xs transition-all cursor-pointer border ${
                           !notif.isRead 
                             ? 'bg-teal-50/70 dark:bg-teal-950/40 border-teal-200 dark:border-teal-800/70' 
-                            : 'bg-slate-50 dark:bg-slate-850/60 border-slate-100 dark:border-slate-800 opacity-80 hover:opacity-100'
+                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-100 dark:border-slate-800 opacity-80 hover:opacity-100'
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
@@ -423,8 +405,8 @@ export const Navbar: React.FC = () => {
                             )}
                             <span className="font-extrabold text-slate-800 dark:text-slate-200">{notif.title}</span>
                           </div>
-                          <span className="text-[9px] text-slate-400 font-mono">
-                            {toPersianDigits(notif.dateJalali)}
+                          <span className="text-[9px] text-slate-400 font-mono whitespace-nowrap">
+                            {toPersianDigits(notif.dateJalali)} {toPersianDigits(notif.timeString)}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{notif.message}</p>

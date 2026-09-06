@@ -19,6 +19,7 @@ import { meetingService } from '../../services/meetingService';
 import { Meeting, MeetingStatus } from '../../types';
 import { toPersianDigits, getMeetingTypeLabel, getMeetingStatusMeta } from '../../utils/formatters';
 import { mockDepartments } from '../../mock/data';
+import { hasOrgWideMeetingAccess } from '../../services/userScope';
 import { ListViewActions, ListViewMode } from '../../components/common/ListViewActions';
 import { exportListToPdf } from '../../utils/pdfExport';
 
@@ -45,7 +46,7 @@ export const MeetingListView: React.FC = () => {
         searchTerm,
         status: statusFilter,
         departmentId: departmentFilter,
-        participantUserId: currentUser.role === 'ADMIN' || currentUser.role === 'CEO' ? undefined : currentUser.id,
+        participantUserId: hasOrgWideMeetingAccess(currentUser.role) ? undefined : currentUser.id,
         pageSize: 50,
       });
       if (res.isSuccess) {

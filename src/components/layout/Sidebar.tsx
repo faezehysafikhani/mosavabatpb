@@ -18,6 +18,7 @@ import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
 import { meetingService, resolutionService, taskService, approvalService } from '../../services';
 import { GUIDE_SLIDES } from '../../modules/guide/UserGuideView';
+import { hasOrgWideMeetingAccess } from '../../services/userScope';
 
 interface NavGroup {
   id: string;
@@ -48,7 +49,7 @@ export const Sidebar: React.FC = () => {
   useEffect(() => {
     const isAdmin = currentUser.role === 'ADMIN';
     Promise.all([
-      meetingService.getMeetings({ pageSize: 1, participantUserId: isAdmin ? undefined : currentUser.id }),
+      meetingService.getMeetings({ pageSize: 1, participantUserId: hasOrgWideMeetingAccess(currentUser.role) ? undefined : currentUser.id }),
       resolutionService.getResolutions({ pageSize: 1, relatedUserId: isAdmin ? undefined : currentUser.id }),
       taskService.getMyTasks(currentUser.id, { pageSize: 1 }),
       approvalService.getMyApprovals(currentUser.id, { pageSize: 1, status: 'PENDING' }),

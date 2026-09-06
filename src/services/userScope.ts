@@ -1,4 +1,13 @@
-import { Meeting, Resolution, User } from '../types';
+import { Meeting, Resolution, User, UserRole } from '../types';
+
+// Roles with organization-wide meeting visibility: ADMIN (system-wide), CEO
+// (chairs/approves every meeting's agenda) and SECRETARY (مسئول دفتر — runs
+// the meeting/proposal secretariat on the CEO's behalf, so their view must
+// cover every meeting, not just ones they're personally listed on). Every
+// other role only sees meetings they organize, secretary, or are a member of
+// (see the participantUserId filter in meetingService.getMeetings).
+export const hasOrgWideMeetingAccess = (role: UserRole): boolean =>
+  role === 'ADMIN' || role === 'CEO' || role === 'SECRETARY';
 
 const normalizeName = (value?: string) => (value || '')
   .replace(/\b(جناب|سرکار|خانم|آقای|دکتر|مهندس)\b/g, '')

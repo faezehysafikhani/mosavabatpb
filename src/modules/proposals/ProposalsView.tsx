@@ -49,6 +49,7 @@ export const ProposalsView: React.FC = () => {
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
   const [orderAssignees, setOrderAssignees] = useState<Record<string, string>>({});
   const [orderDeadlines, setOrderDeadlines] = useState<Record<string, string>>({});
+  const [orderFormOpen, setOrderFormOpen] = useState<Record<string, boolean>>({});
   const [revisionTitles, setRevisionTitles] = useState<Record<string, string>>({});
   const [revisionDescriptions, setRevisionDescriptions] = useState<Record<string, string>>({});
   const [revisionRationales, setRevisionRationales] = useState<Record<string, string>>({});
@@ -261,13 +262,6 @@ export const ProposalsView: React.FC = () => {
                 placeholder="توضیحات تصمیم / دلیل برگشت / متن دستور مدیرعامل"
                 className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select value={orderAssignees[p.id] || ''} onChange={(e) => setOrderAssignees((prev) => ({ ...prev, [p.id]: e.target.value }))} className="text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                  <option value="">مسئول دستور مدیرعامل...</option>
-                  {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} — {user.title}</option>)}
-                </select>
-                <input value={orderDeadlines[p.id] || ''} onChange={(e) => setOrderDeadlines((prev) => ({ ...prev, [p.id]: e.target.value }))} placeholder="مهلت دستور، مثال ۱۴۰۵/۰۷/۳۰" className="text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl" />
-              </div>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button onClick={() => handleReview(p, 'APPROVED')} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl cursor-pointer">
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -279,9 +273,34 @@ export const ProposalsView: React.FC = () => {
                 </button>
                 <button onClick={() => handleCeoAlternative(p, 'RETURN')} className="flex items-center gap-1.5 bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold py-2 px-3 rounded-xl"><RotateCcw className="w-3.5 h-3.5" />برگشت جهت اصلاح</button>
                 <button onClick={() => handleCeoAlternative(p, 'NO_BOARD_REQUIRED')} className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl">عدم نیاز به طرح</button>
-                <button onClick={() => handleCeoAlternative(p, 'CEO_ORDER_ISSUED')} className="flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold py-2 px-3 rounded-xl"><ClipboardCheck className="w-3.5 h-3.5" />صدور دستور</button>
+                <button
+                  onClick={() => setOrderFormOpen((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                  className={`flex items-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl border cursor-pointer ${orderFormOpen[p.id] ? 'bg-purple-700 text-white border-purple-700' : 'bg-purple-50 text-purple-700 border-purple-200'}`}
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5" />صدور دستور
+                </button>
                 <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl"><Archive className="w-3.5 h-3.5" />بایگانی</button>
               </div>
+
+              {/* Assignee/deadline apply only to "صدور دستور" (a direct CEO
+                  order) — kept out of the shared controls above so picking a
+                  مسئول دستور here can never be confused with, or silently
+                  dropped by, "برگشت جهت اصلاح" (which always returns to the
+                  original proposer; see proposalService.returnForRevision /
+                  resubmitProposal). */}
+              {orderFormOpen[p.id] && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+                  <div className="text-[10px] font-bold text-purple-800">مشخصات دستور مستقیم مدیرعامل (فقط برای «صدور دستور»)</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select value={orderAssignees[p.id] || ''} onChange={(e) => setOrderAssignees((prev) => ({ ...prev, [p.id]: e.target.value }))} className="text-xs p-2.5 bg-white border border-purple-200 rounded-xl">
+                      <option value="">مسئول دستور مدیرعامل...</option>
+                      {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} — {user.title}</option>)}
+                    </select>
+                    <input value={orderDeadlines[p.id] || ''} onChange={(e) => setOrderDeadlines((prev) => ({ ...prev, [p.id]: e.target.value }))} placeholder="مهلت دستور، مثال ۱۴۰۵/۰۷/۳۰" className="text-xs p-2.5 bg-white border border-purple-200 rounded-xl" />
+                  </div>
+                  <button onClick={() => handleCeoAlternative(p, 'CEO_ORDER_ISSUED')} className="bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold py-2 px-4 rounded-xl cursor-pointer">ثبت دستور مدیرعامل</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
