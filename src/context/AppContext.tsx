@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, AppNotification, PermissionKey } from '../types';
-import { mockUsers, mockNotifications } from '../mock/data';
+import { mockUsers, mockNotifications, mockTasks, mockResolutions } from '../mock/data';
 import { userService } from '../services/userService';
 import { loadLocalCollection, loadLocalValue, saveLocalCollection, saveLocalValue } from '../services/localStore';
 
@@ -134,6 +134,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleDarkMode = () => {
     setAppTheme(isDarkMode ? 'brand' : 'dark');
   };
+
+  useEffect(() => {
+    const today = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/[\u200e\u200f]/g, '');
+    const numeric = (value: string) => Number(value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))).replace(/\//g, ''));
+    const todayValue = numeric(today);
+    const allTasks = loadLocalCollection('tasks', mockTasks);
+    const overdueResolutionIds = new Set<string>();
+    allTasks.forEach((task) => { const deadline = numeric(task.deadlineJalali); if (deadline > 0 && !['CLOSED', 'COMPLETED', 'PENDING_APPROVAL'].includes(task.status) && deadline < todayValue) { task.status = 'OVERDUE'; overdueResolutionIds.add(task.resolutionId); } });
+    if (overdueResolutionIds.size > 0) {
+      saveLocalCollection('tasks', allTasks);
+      const resolutions = loadLocalCollection('resolutions', mockResolutions);
+      resolutions.forEach((resolution) => { if (overdueResolutionIds.has(resolution.id) && !['APPROVED_CLOSED', 'ARCHIVED'].includes(resolution.executionStatus)) resolution.executionStatus = 'OVERDUE'; });
+      saveLocalCollection('resolutions', resolutions);
+    }
+    const tasks = allTasks.filter((task) => task.assignedToUserId === currentUser.id && !['CLOSED', 'COMPLETED', 'PENDING_APPROVAL'].includes(task.status));
+    setNotifications((previous) => {
+      const next = [...previous];
+      tasks.forEach((task) => {
+        const deadline = numeric(task.deadlineJalali); const overdue = deadline < todayValue; const near = !overdue && Math.floor(deadline / 100) === Math.floor(todayValue / 100) && deadline - todayValue <= 7;
+        if (!overdue && !near) return;
+        const id = `deadline-${task.id}-${overdue ? 'overdue' : 'near'}`;
+        if (!next.some((item) => item.id === id)) next.unshift({ id, title: overdue ? 'تأخیر در اجرای مصوبه' : 'نزدیک‌شدن مهلت مصوبه', message: `${task.resolutionNumber} — ${task.resolutionTitle} — مهلت ${task.deadlineJalali}`, dateJalali: today, timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), isRead: false, type: overdue ? 'DEADLINE' : 'FOLLOW_UP', targetRoute: 'tasks', targetResolutionId: task.resolutionId });
+      });
+      saveLocalCollection('notifications', next); return next;
+    });
+  }, [currentUser.id, refreshTrigger]);
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 

@@ -81,6 +81,7 @@ export interface User {
   birthDateJalali?: string;
   signatureUrl?: string;
   isActive: boolean;
+  archivedAt?: string;
   permissions: string[];
 }
 
@@ -250,6 +251,21 @@ export interface MeetingInvitation {
   attachmentIds: string[];
 }
 
+export interface MeetingOutcomeLetter {
+  id: string;
+  letterNumber: string;
+  meetingId: string;
+  agendaItemId: string;
+  proposalId?: string;
+  recipientName: string;
+  recipientDepartment: string;
+  decision: NonNullable<AgendaItem['outcomeStatus']>;
+  text: string;
+  status: 'SENT';
+  createdAt: string;
+  createdByUserId: string;
+}
+
 export interface RelatedUserRef {
   userId: string;
   fullName: string;
@@ -296,6 +312,51 @@ export interface Meeting {
   updatedAt: string;
 }
 
+export interface BoardMinutesSignature {
+  memberUserId: string;
+  memberName: string;
+  memberTitle: string;
+  status: 'PENDING' | 'SIGNED';
+  signedAt?: string;
+  comments?: string;
+}
+
+export interface BoardMinutes {
+  id: string;
+  meetingId: string;
+  meetingNumber: string;
+  status: 'DRAFT' | 'WAITING_SIGNATURES' | 'PARTIALLY_SIGNED' | 'SIGNED' | 'FINALIZED';
+  content: string;
+  copiesCount: 3;
+  signatures: BoardMinutesSignature[];
+  createdByUserId: string;
+  createdByName: string;
+  createdAt: string;
+  updatedByUserId: string;
+  updatedByName: string;
+  updatedAt: string;
+  finalizedAt?: string;
+  history: WorkflowHistoryEntry[];
+}
+
+export interface ResolutionNotice {
+  id: string;
+  noticeNumber: string;
+  resolutionId: string;
+  resolutionNumber: string;
+  meetingId: string;
+  dateJalali: string;
+  recipientName: string;
+  recipientDepartment: string;
+  text: string;
+  deadlineJalali?: string;
+  attachmentIds: string[];
+  status: 'SENT' | 'RECEIVED';
+  sentAt: string;
+  receivedAt?: string;
+  createdByUserId: string;
+}
+
 // Resolution Approval Status at the meeting table
 export type ResolutionApprovalStatus = 
   | 'NOT_APPROVED'      // تصویب نشده
@@ -310,6 +371,9 @@ export type ResolutionExecutionStatus =
   | 'PENDING_OFFICE_SIGNATURE' // در انتظار امضای مسئول دفتر
   | 'PENDING_CEO_SIGNATURE'    // در انتظار امضای مدیرعامل
   | 'PENDING_ADMIN_SIGNATURE'  // در انتظار امضای ادمین
+  | 'WAITING_MINUTES_SIGNATURE' // در انتظار صورت‌جلسه تجمیعی
+  | 'WAITING_NOTIFICATION'     // در انتظار ابلاغ رسمی
+  | 'NOTIFIED'                 // ابلاغ شده و آماده اجرا
   | 'NOT_STARTED'       // شروع نشده
   | 'IN_PROGRESS'       // در حال انجام
   | 'WAITING_RESPONSE'  // در انتظار پاسخ یا همکاری
@@ -318,7 +382,8 @@ export type ResolutionExecutionStatus =
   | 'PENDING_APPROVAL'  // در انتظار صحه‌گذاری
   | 'APPROVED_CLOSED'   // تایید نهایی و خاتمه‌یافته
   | 'REJECTED_RETURNED' // رد شده در صحه‌گذاری و بازگشت داده شده
-  | 'OVERDUE';          // عقب‌افتاده از موعد مقرر
+  | 'OVERDUE'           // عقب‌افتاده از موعد مقرر
+  | 'ARCHIVED';         // بایگانی شده بدون حذف فیزیکی
 
 export type PriorityLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' | 'CRITICAL';
 
@@ -505,7 +570,7 @@ export interface AppNotification {
   dateJalali: string;
   timeString: string;
   isRead: boolean;
-  type: 'ASSIGNMENT' | 'DEADLINE' | 'APPROVAL_REQUEST' | 'APPROVED' | 'REJECTED' | 'MEETING';
+  type: 'ASSIGNMENT' | 'DEADLINE' | 'FOLLOW_UP' | 'APPROVAL_REQUEST' | 'APPROVED' | 'REJECTED' | 'MEETING';
   targetRoute?: string;
   targetResolutionId?: string;
 }

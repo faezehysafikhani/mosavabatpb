@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { meetingService, resolutionService } from '../../services';
-import { Meeting, Resolution, AgendaItem } from '../../types';
+import { meetingService, resolutionService, boardSecretariatService } from '../../services';
+import { Meeting, Resolution, AgendaItem, BoardMinutes, ResolutionNotice, MeetingOutcomeLetter } from '../../types';
 import {
   Calendar,
   Clock,
@@ -53,6 +53,10 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
   const [guestPhone, setGuestPhone] = useState('');
   const [guestAgendaId, setGuestAgendaId] = useState('');
   const [guestTime, setGuestTime] = useState('');
+  const [boardMinutes, setBoardMinutes] = useState<BoardMinutes | null>(null);
+  const [minutesContent, setMinutesContent] = useState('');
+  const [notices, setNotices] = useState<ResolutionNotice[]>([]);
+  const [outcomeLetters, setOutcomeLetters] = useState<MeetingOutcomeLetter[]>([]);
   const printableRef = useRef<HTMLDivElement>(null);
   const canCreateResolution = hasPermission('CREATE_RESOLUTION');
 
@@ -63,9 +67,12 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
   const loadMeetingDetails = async () => {
     setLoading(true);
     try {
-      const [meetRes, resRes] = await Promise.all([
+      const [meetRes, resRes, minutesRes, noticesRes, lettersRes] = await Promise.all([
         meetingService.getMeetingById(meetingId),
         resolutionService.getResolutions({ meetingId, pageSize: 50 }),
+        boardSecretariatService.getMinutes(meetingId),
+        boardSecretariatService.getNotices(meetingId),
+        meetingService.getOutcomeLetters(meetingId),
       ]);
 
       if (meetRes.isSuccess && meetRes.data) {
@@ -74,6 +81,9 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
       if (resRes.isSuccess) {
         setResolutions(resRes.data.items);
       }
+      if (minutesRes.isSuccess) { setBoardMinutes(minutesRes.data); if (minutesRes.data) setMinutesContent(minutesRes.data.content); }
+      if (noticesRes.isSuccess) setNotices(noticesRes.data);
+      if (lettersRes.isSuccess) setOutcomeLetters(lettersRes.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -150,6 +160,22 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
     try { await meetingService.markInvitationViewed(meetingId, currentUser.id, currentUser); showToast('دعوتنامه', 'مشاهده دعوتنامه ثبت شد.', 'success'); triggerRefresh(); }
     catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ثبت مشاهده انجام نشد.', 'error'); }
   };
+
+  const refreshGovernance = async () => {
+    const [minutesRes, noticesRes] = await Promise.all([boardSecretariatService.getMinutes(meetingId), boardSecretariatService.getNotices(meetingId)]);
+    setBoardMinutes(minutesRes.data); setNotices(noticesRes.data); if (minutesRes.data) setMinutesContent(minutesRes.data.content); triggerRefresh();
+  };
+
+  const handleCreateMinutes = async () => {
+    if (!meeting) return;
+    const defaultText = `جلسه ${meeting.meetingNumber} با عنوان «${meeting.title}» در تاریخ ${meeting.dateJalali} برگزار شد. موضوعات دستورکار بررسی و نتایج و مصوبات مطابق جداول این سند ثبت گردید.`;
+    try { await boardSecretariatService.createMinutes(meeting, minutesContent || defaultText, currentUser); await refreshGovernance(); showToast('صورت‌جلسه تجمیعی', 'پیش‌نویس رسمی در سه نسخه ایجاد شد.', 'success'); } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ایجاد صورت‌جلسه انجام نشد.', 'error'); }
+  };
+  const handleSaveMinutes = async () => { try { await boardSecretariatService.updateMinutes(meetingId, minutesContent, currentUser); await refreshGovernance(); showToast('ذخیره صورت‌جلسه', 'پیش‌نویس ذخیره شد.', 'success'); } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ذخیره انجام نشد.', 'error'); } };
+  const handleStartMinutesSignatures = async () => { try { await boardSecretariatService.startSignatures(meetingId, currentUser); await refreshGovernance(); showToast('ارسال برای امضا', 'صورت‌جلسه در کارتابل اعضای حاضر قرار گرفت.', 'success'); } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ارسال انجام نشد.', 'error'); } };
+  const handleSignMinutes = async () => { if (!window.confirm('آیا صورت‌جلسه تجمیعی را تأیید و امضا می‌کنید؟')) return; try { await boardSecretariatService.signMinutes(meetingId, currentUser); await refreshGovernance(); showToast('امضای صورت‌جلسه', 'امضای شما ثبت شد.', 'success'); } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'امضا ثبت نشد.', 'error'); } };
+  const handleFinalizeMinutes = async () => { try { await boardSecretariatService.finalizeMinutes(meetingId, currentUser); await refreshGovernance(); showToast('نهایی‌سازی', 'صورت‌جلسه نهایی و مصوبات آماده ابلاغ شدند.', 'success'); } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'نهایی‌سازی انجام نشد.', 'error'); } };
+  const handleIssueNotices = async () => { try { await boardSecretariatService.issueNotices(meetingId, currentUser); await refreshGovernance(); showToast('ابلاغ مصوبات', 'ابلاغیه‌ها صادر شدند و Workflow اجرای مصوبات آغاز شد.', 'success'); } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ابلاغ انجام نشد.', 'error'); } };
 
   if (loading || !meeting) {
     return (
@@ -357,6 +383,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
               const relatedResolutions = resolutions.filter(
                 (r) => r.agendaItemId === ag.id || r.topicTitle.toLowerCase().includes(ag.title.toLowerCase())
               );
+              const outcomeLetter = outcomeLetters.find((letter) => letter.agendaItemId === ag.id);
 
               return (
                 <div
@@ -404,6 +431,8 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
                       {ag.outcomeNotes}
                     </div>
                   )}
+
+                  {outcomeLetter && <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900"><Mail className="inline w-4 h-4 ml-1" /><strong>{outcomeLetter.letterNumber}</strong> برای {outcomeLetter.recipientName} / {outcomeLetter.recipientDepartment} صادر شد و در سوابق پیشنهاد و جلسه قابل ردیابی است.</div>}
 
                   {isSecretariat && !ag.isRemoved && ['INVITATION_SENT', 'SCHEDULED', 'IN_PROGRESS', 'HELD'].includes(meeting.status) && (
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 bg-white rounded-xl border border-slate-200">
@@ -601,6 +630,17 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
       {/* Tab 5: Official Minutes Preview & Print */}
       {activeTab === 'MINUTES_PRINT' && (
         <div className="space-y-3">
+          <div className="no-print bg-white border border-slate-200 rounded-3xl p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-extrabold text-slate-900">صورت‌جلسه تجمیعی هیأت‌مدیره</h3><p className="text-[11px] text-slate-500">پیش‌نویس، امضای اعضای حاضر، نهایی‌سازی سه نسخه و ابلاغ مصوبات</p></div>{boardMinutes && <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-bold">{boardMinutes.status === 'DRAFT' ? 'پیش‌نویس' : boardMinutes.status === 'WAITING_SIGNATURES' ? 'در انتظار امضا' : boardMinutes.status === 'PARTIALLY_SIGNED' ? 'بخشی امضا شده' : boardMinutes.status === 'SIGNED' ? 'تکمیل امضاها' : 'نهایی‌شده'}</span>}</div>
+            {!boardMinutes && isSecretariat && <button onClick={handleCreateMinutes} className="bg-teal-800 text-white px-4 py-2 rounded-xl text-xs font-bold">ایجاد پیش‌نویس صورت‌جلسه</button>}
+            {boardMinutes && <>
+              <textarea rows={5} value={minutesContent} onChange={(event) => setMinutesContent(event.target.value)} disabled={boardMinutes.status !== 'DRAFT' || !isSecretariat} className="w-full text-xs leading-7 p-4 bg-slate-50 border border-slate-200 rounded-2xl disabled:opacity-80" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">{boardMinutes.signatures.map((signature) => <div key={signature.memberUserId} className={`p-3 rounded-2xl border ${signature.status === 'SIGNED' ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}><strong className="text-slate-800">{signature.memberName}</strong><span className="block text-[10px] text-slate-500">{signature.memberTitle}</span><span className="block text-[10px] font-bold mt-2">{signature.status === 'SIGNED' ? `امضا شده — ${toPersianDigits(new Date(signature.signedAt!).toLocaleString('fa-IR'))}` : 'در انتظار امضا'}</span></div>)}</div>
+              <div className="flex flex-wrap gap-2">{isSecretariat && boardMinutes.status === 'DRAFT' && <><button onClick={handleSaveMinutes} className="bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold">ذخیره پیش‌نویس</button><button onClick={handleStartMinutesSignatures} className="bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold">ارسال برای امضای اعضا</button></>}{['WAITING_SIGNATURES', 'PARTIALLY_SIGNED'].includes(boardMinutes.status) && boardMinutes.signatures.some((item) => item.memberUserId === currentUser.id && item.status === 'PENDING') && <button onClick={handleSignMinutes} className="bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold">امضای صورت‌جلسه</button>}{isSecretariat && boardMinutes.status === 'SIGNED' && <button onClick={handleFinalizeMinutes} className="bg-teal-800 text-white px-4 py-2 rounded-xl text-xs font-bold">نهایی‌سازی در سه نسخه</button>}{isSecretariat && boardMinutes.status === 'FINALIZED' && notices.length === 0 && <button onClick={handleIssueNotices} className="bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold">صدور و ارسال ابلاغیه مصوبات</button>}</div>
+              <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><summary className="cursor-pointer font-bold text-slate-700">ردپای تغییرات صورت‌جلسه ({toPersianDigits(boardMinutes.history.length)})</summary><div className="mt-3 space-y-2">{boardMinutes.history.map((entry) => <div key={entry.id} className="flex flex-wrap justify-between gap-2 border-b border-slate-200 pb-2 last:border-0"><span><strong>{entry.action}</strong> — {entry.actorName}</span><span className="text-slate-500">{toPersianDigits(entry.dateJalali)}، {toPersianDigits(entry.timeString)}</span></div>)}</div></details>
+              {notices.length > 0 && <div className="border-t border-slate-100 pt-3"><div className="font-extrabold text-slate-800 mb-2">ابلاغیه‌های صادرشده ({toPersianDigits(notices.length)})</div><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{notices.map((notice) => <div key={notice.id} className="p-3 bg-blue-50/40 border border-blue-200 rounded-xl"><strong>{notice.noticeNumber} — {notice.resolutionNumber}</strong><span className="block text-[10px] text-slate-600">گیرنده: {notice.recipientName} ({notice.recipientDepartment})</span><span className="block text-[10px] text-blue-700 mt-1">{notice.status === 'RECEIVED' ? 'دریافت شده' : 'ارسال شده'} — مهلت: {toPersianDigits(notice.deadlineJalali || '—')}</span></div>)}</div></div>}
+            </>}
+          </div>
           <div className="no-print flex items-center justify-end gap-2">
             <button
               onClick={handlePrintMinutesPreview}

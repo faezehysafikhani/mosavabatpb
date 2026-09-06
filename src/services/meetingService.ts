@@ -1,7 +1,7 @@
-import { Meeting, MeetingStatus, ApiResponse, ApiFilterParams, PagedResult, User, MeetingGuest, AgendaItem } from '../types';
+import { Meeting, MeetingStatus, ApiResponse, ApiFilterParams, PagedResult, User, MeetingGuest, AgendaItem, MeetingOutcomeLetter, Proposal } from '../types';
 import { mockDepartments, mockMeetings, mockResolutions } from '../mock/data';
 import { apiClient } from './api/apiClient';
-import { loadLocalCollection, saveLocalCollection } from './localStore';
+import { loadLocalCollection, loadLocalValue, saveLocalCollection, saveLocalValue } from './localStore';
 import { smsService } from './smsService';
 
 export interface CreateMeetingDto {
@@ -35,6 +35,7 @@ export interface IMeetingService {
   sendInvitations(id: string, actor: User): Promise<ApiResponse<Meeting>>;
   markInvitationViewed(id: string, recipientId: string, actor: User): Promise<ApiResponse<Meeting>>;
   recordAgendaOutcome(id: string, agendaItemId: string, outcomeStatus: NonNullable<AgendaItem['outcomeStatus']>, notes: string, actor: User): Promise<ApiResponse<Meeting>>;
+  getOutcomeLetters(meetingId: string): Promise<ApiResponse<MeetingOutcomeLetter[]>>;
 }
 
 class MockMeetingService implements IMeetingService {
@@ -181,9 +182,14 @@ class MockMeetingService implements IMeetingService {
 
   public async deleteMeeting(id: string): Promise<ApiResponse<boolean>> {
     const meetings = this.getMeetingsData();
-    const next = meetings.filter((m) => m.id !== id);
-    this.saveMeetingsData(next);
-    return apiClient.simulateNetwork(next.length < meetings.length, 150);
+    const meeting = meetings.find((item) => item.id === id);
+    if (!meeting) return apiClient.simulateNetwork(false, 150);
+    const previousStatus = meeting.status;
+    meeting.status = 'CANCELLED';
+    meeting.history = [...(meeting.history || []), { id: `meeting-history-${Date.now()}`, action: 'بایگانی جلسه بدون حذف اطلاعات', actorUserId: 'system', actorName: 'سامانه', actorRole: 'سیستم', fromStatus: previousStatus, toStatus: 'CANCELLED', dateJalali: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()).replace(/[\u200e\u200f]/g, ''), timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) }];
+    meeting.updatedAt = new Date().toISOString();
+    this.saveMeetingsData(meetings);
+    return apiClient.simulateNetwork(true, 150);
   }
 
   public async updateMeetingStatus(id: string, status: MeetingStatus): Promise<ApiResponse<Meeting>> {
@@ -306,8 +312,28 @@ class MockMeetingService implements IMeetingService {
     const previousStatus = meeting.status;
     meeting.status = 'IN_PROGRESS';
     this.addHistory(meeting, actor, `ثبت نتیجه بند ${agenda.order}: ${agenda.title}`, previousStatus, notes.trim());
+    if (!['APPROVED', 'CONDITIONAL'].includes(outcomeStatus)) {
+      const proposals = loadLocalValue<Proposal[]>('proposals', []);
+      const proposal = proposals.find((item) => item.id === agenda.sourceProposalId);
+      const letters = loadLocalCollection<MeetingOutcomeLetter[]>('outcomeLetters', []);
+      const existing = letters.find((item) => item.meetingId === id && item.agendaItemId === agendaItemId);
+      const letter: MeetingOutcomeLetter = existing || { id: `outcome-letter-${Date.now()}`, letterNumber: `نامه-${new Date().getFullYear()}-${letters.length + 1}`, meetingId: id, agendaItemId, proposalId: agenda.sourceProposalId, recipientName: proposal?.proposerName || agenda.presenterName || agenda.presenter, recipientDepartment: proposal?.proposerDepartmentName || meeting.departmentName, decision: outcomeStatus, text: notes.trim(), status: 'SENT', createdAt: new Date().toISOString(), createdByUserId: actor.id };
+      letter.decision = outcomeStatus; letter.text = notes.trim();
+      if (!existing) letters.unshift(letter);
+      saveLocalCollection('outcomeLetters', letters);
+      if (proposal) {
+        proposal.history = [...(proposal.history || []), { id: `proposal-letter-${Date.now()}`, action: `ثبت ${letter.letterNumber} نتیجه جلسه`, actorUserId: actor.id, actorName: actor.fullName, actorRole: actor.title, fromStatus: proposal.status, toStatus: proposal.status, dateJalali: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()).replace(/[\u200e\u200f]/g, ''), timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), notes: notes.trim() }];
+        proposal.updatedAt = new Date().toISOString();
+        saveLocalValue('proposals', proposals);
+      }
+      this.addHistory(meeting, actor, `صدور ${letter.letterNumber} برای نتیجه غیرمصوب`, meeting.status, `گیرنده: ${letter.recipientName}`);
+    }
     this.saveMeetingsData(meetings);
     return apiClient.simulateNetwork(meeting, 120);
+  }
+
+  public async getOutcomeLetters(meetingId: string): Promise<ApiResponse<MeetingOutcomeLetter[]>> {
+    return apiClient.simulateNetwork(loadLocalCollection<MeetingOutcomeLetter[]>('outcomeLetters', []).filter((item) => item.meetingId === meetingId), 70);
   }
 }
 

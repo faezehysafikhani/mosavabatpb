@@ -32,6 +32,9 @@ export const ResolutionListView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [executionFilter, setExecutionFilter] = useState<string>('ALL');
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
+  const [proposerDepartmentFilter, setProposerDepartmentFilter] = useState<string>('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeModalResId, setActiveModalResId] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -39,7 +42,7 @@ export const ResolutionListView: React.FC = () => {
 
   useEffect(() => {
     fetchResolutions();
-  }, [searchTerm, executionFilter, departmentFilter, refreshTrigger, currentUser.id]);
+  }, [searchTerm, executionFilter, departmentFilter, proposerDepartmentFilter, fromDate, toDate, refreshTrigger, currentUser.id]);
 
   useEffect(() => {
     if (selectedResolutionId) setActiveModalResId(selectedResolutionId);
@@ -52,6 +55,9 @@ export const ResolutionListView: React.FC = () => {
         searchTerm,
         executionStatus: executionFilter,
         departmentId: departmentFilter,
+        proposerDepartmentName: proposerDepartmentFilter,
+        fromDateJalali: fromDate || undefined,
+        toDateJalali: toDate || undefined,
         relatedUserId: currentUser.role === 'ADMIN' ? undefined : currentUser.id,
         pageSize: 50,
       });
@@ -130,11 +136,17 @@ export const ResolutionListView: React.FC = () => {
             <option value="PENDING_OFFICE_SIGNATURE">در انتظار امضای مسئول دفتر</option>
             <option value="PENDING_CEO_SIGNATURE">در انتظار امضای مدیرعامل</option>
             <option value="PENDING_ADMIN_SIGNATURE">در انتظار امضای ادمین</option>
+            <option value="WAITING_MINUTES_SIGNATURE">در انتظار امضای صورت‌جلسه</option>
+            <option value="WAITING_NOTIFICATION">در انتظار ابلاغ رسمی</option>
+            <option value="NOTIFIED">ابلاغ شده</option>
             <option value="IN_PROGRESS">در حال انجام (In Progress)</option>
+            <option value="WAITING_RESPONSE">در انتظار پاسخ یا همکاری</option>
+            <option value="NEEDS_FOLLOW_UP">نیازمند پیگیری دبیرخانه</option>
             <option value="PENDING_APPROVAL">در انتظار صحه‌گذاری (Pending Verification)</option>
             <option value="APPROVED_CLOSED">خاتمه یافته و تایید شده (Closed)</option>
             <option value="REJECTED_RETURNED">عدم تایید در صحه‌گذاری / برگشتی</option>
             <option value="OVERDUE">عقب‌افتاده از موعد (Overdue)</option>
+            <option value="ARCHIVED">بایگانی‌شده</option>
           </select>
         </div>
 
@@ -150,6 +162,18 @@ export const ResolutionListView: React.FC = () => {
             ))}
           </select>
         </div>
+        <div>
+          <select value={proposerDepartmentFilter} onChange={(e) => setProposerDepartmentFilter(e.target.value)} className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-700">
+            <option value="ALL">همه واحدهای پیشنهاددهنده</option>
+            {mockDepartments.map((department) => <option key={department.id} value={department.name}>{department.name}</option>)}
+          </select>
+        </div>
+        <label className="text-[10px] text-slate-500">از تاریخ ثبت/ارجاع
+          <input value={fromDate} onChange={(e) => setFromDate(e.target.value)} placeholder="۱۴۰۳/۰۱/۰۱" className="block w-full mt-1 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl" />
+        </label>
+        <label className="text-[10px] text-slate-500">تا تاریخ ثبت/ارجاع
+          <input value={toDate} onChange={(e) => setToDate(e.target.value)} placeholder="۱۴۰۳/۱۲/۲۹" className="block w-full mt-1 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl" />
+        </label>
       </div>}
 
       {/* Resolutions Grid */}

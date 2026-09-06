@@ -17,7 +17,7 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { reportService } from '../../services/reportService';
+import { reportService, SemiAnnualReport } from '../../services/reportService';
 import { resolutionService } from '../../services/resolutionService';
 import { mockDepartments } from '../../mock/data';
 import { DepartmentPerformance, DashboardKPIs, Resolution } from '../../types';
@@ -25,7 +25,7 @@ import { toPersianDigits, getResolutionExecutionMeta } from '../../utils/formatt
 import { useApp } from '../../context/AppContext';
 
 export const ReportsView: React.FC = () => {
-  const { showToast } = useApp();
+  const { showToast, navigateTo } = useApp();
   const [departments, setDepartments] = useState<DepartmentPerformance[]>([]);
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [monthlyTrends, setMonthlyTrends] = useState<any[]>([]);
@@ -33,6 +33,9 @@ export const ReportsView: React.FC = () => {
   const [detailDept, setDetailDept] = useState<DepartmentPerformance | null>(null);
   const [detailResolutions, setDetailResolutions] = useState<Resolution[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [fromDate, setFromDate] = useState('۱۴۰۳/۰۱/۰۱');
+  const [toDate, setToDate] = useState('۱۴۰۵/۱۲/۲۹');
+  const [semiAnnual, setSemiAnnual] = useState<SemiAnnualReport | null>(null);
 
   useEffect(() => {
     loadReports();
@@ -41,15 +44,17 @@ export const ReportsView: React.FC = () => {
   const loadReports = async () => {
     setLoading(true);
     try {
-      const [deptRes, kpiRes, trendRes] = await Promise.all([
+      const [deptRes, kpiRes, trendRes, semiRes] = await Promise.all([
         reportService.getDepartmentPerformances(),
         reportService.getDashboardKPIs(),
         reportService.getMonthlyTrends(),
+        reportService.getSemiAnnualReport(fromDate, toDate),
       ]);
 
       if (deptRes.isSuccess) setDepartments(deptRes.data);
       if (kpiRes.isSuccess) setKpis(kpiRes.data);
       if (trendRes.isSuccess) setMonthlyTrends(trendRes.data);
+      if (semiRes.isSuccess) setSemiAnnual(semiRes.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -58,7 +63,10 @@ export const ReportsView: React.FC = () => {
   };
 
   const handleExport = () => {
-    showToast('گزارش عملکرد', 'گزارش جامع آماری در قالب اکسل دانلود شد.', 'info');
+    if (!semiAnnual) return;
+    const rows = [['شاخص', 'مقدار'], ['کل مصوبات', semiAnnual.total], ['اجراشده', semiAnnual.completed], ['در حال اجرا', semiAnnual.inProgress], ['اجرا نشده', semiAnnual.notStarted], ['دارای تأخیر', semiAnnual.overdue], ['درصد تحقق', `${semiAnnual.fulfillmentPercent}%`], [], ['واحد', 'تعداد', 'تکمیل‌شده'], ...semiAnnual.byDepartment.map((item) => [item.name, item.count, item.completed])];
+    const csv = '\ufeff' + rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `گزارش-شش-ماهه-${fromDate}-${toDate}.csv`; anchor.click(); URL.revokeObjectURL(url);
+    showToast('گزارش عملکرد', 'فایل واقعی گزارش شش‌ماهه دانلود شد.', 'success');
   };
 
   const handleOpenDeptDetail = async (dept: DepartmentPerformance) => {
@@ -104,6 +112,11 @@ export const ReportsView: React.FC = () => {
             <span>خروجی فایل اکسل</span>
           </button>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-100 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-3"><div><h3 className="text-sm font-extrabold text-slate-900">گزارش شش‌ماهه نتایج مصوبات</h3><p className="text-[11px] text-slate-500">بازه شمسی دلخواه را برای دوره شش‌ماهه انتخاب کنید.</p></div><div className="flex flex-wrap items-end gap-2"><label className="text-[10px] text-slate-500">از تاریخ<input value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="block mt-1 text-xs p-2 border rounded-lg" /></label><label className="text-[10px] text-slate-500">تا تاریخ<input value={toDate} onChange={(e) => setToDate(e.target.value)} className="block mt-1 text-xs p-2 border rounded-lg" /></label><button onClick={loadReports} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold">محاسبه گزارش</button></div></div>
+        {semiAnnual && <><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">{[{ label: 'کل مصوبات', value: semiAnnual.total }, { label: 'اجراشده', value: semiAnnual.completed }, { label: 'در حال اجرا', value: semiAnnual.inProgress }, { label: 'اجرا نشده', value: semiAnnual.notStarted }, { label: 'دارای تأخیر', value: semiAnnual.overdue }, { label: 'درصد تحقق', value: `${semiAnnual.fulfillmentPercent}٪` }].map((item) => <div key={item.label} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center"><div className="text-[10px] text-slate-500">{item.label}</div><strong className="block text-lg text-slate-900 mt-1">{toPersianDigits(item.value)}</strong></div>)}</div><div className="grid grid-cols-1 lg:grid-cols-3 gap-4"><div><h4 className="text-xs font-bold mb-2">تفکیک بر اساس واحد</h4>{semiAnnual.byDepartment.map((item) => <div key={item.name} className="flex justify-between p-2 border-b text-xs"><span>{item.name}</span><span>{toPersianDigits(item.completed)} از {toPersianDigits(item.count)}</span></div>)}</div><div><h4 className="text-xs font-bold mb-2">تفکیک بر اساس جلسه</h4>{semiAnnual.byMeeting.map((item) => <div key={item.id} className="flex justify-between p-2 border-b text-xs"><span>{item.name}</span><span>{toPersianDigits(item.count)} مصوبه</span></div>)}</div><div><h4 className="text-xs font-bold mb-2">مصوبات مهم و معوق</h4>{semiAnnual.importantOrOverdue.length === 0 ? <div className="text-xs text-slate-400">موردی در این بازه نیست.</div> : semiAnnual.importantOrOverdue.map((item) => <button key={item.id} onClick={() => navigateTo('resolutions', { resolutionId: item.id })} className="w-full text-right p-2 border-b text-xs hover:bg-slate-50"><strong>{item.resolutionNumber}</strong> — {item.topicTitle}</button>)}</div></div></>}
       </div>
 
       {/* Monthly Trend Line Chart */}

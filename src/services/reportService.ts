@@ -24,6 +24,14 @@ export interface IReportService {
   getDepartmentPerformances(): Promise<ApiResponse<DepartmentPerformance[]>>;
   getResolutionStatusDistribution(): Promise<ApiResponse<ResolutionStatusDistribution[]>>;
   getMonthlyTrends(): Promise<ApiResponse<MonthlyMeetingTrend[]>>;
+  getSemiAnnualReport(fromDateJalali: string, toDateJalali: string): Promise<ApiResponse<SemiAnnualReport>>;
+}
+
+export interface SemiAnnualReport {
+  total: number; completed: number; inProgress: number; notStarted: number; overdue: number; fulfillmentPercent: number;
+  byDepartment: { name: string; count: number; completed: number }[];
+  byMeeting: { id: string; name: string; count: number }[];
+  importantOrOverdue: typeof mockResolutions;
 }
 
 class MockReportService implements IReportService {
@@ -126,6 +134,21 @@ class MockReportService implements IReportService {
     ];
 
     return apiClient.simulateNetwork(trends, 120);
+  }
+
+  public async getSemiAnnualReport(fromDateJalali: string, toDateJalali: string): Promise<ApiResponse<SemiAnnualReport>> {
+    const normalize = (value: string) => Number(value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))).replace(/\//g, ''));
+    const from = normalize(fromDateJalali); const to = normalize(toDateJalali);
+    const all = loadLocalCollection('resolutions', mockResolutions);
+    const items = all.filter((item) => { const value = normalize(item.assignedDateJalali || new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date(item.createdAt)).replace(/[\u200e\u200f]/g, '')); return value >= from && value <= to; });
+    const completed = items.filter((item) => item.executionStatus === 'APPROVED_CLOSED').length;
+    const inProgressStatuses = ['IN_PROGRESS', 'WAITING_RESPONSE', 'NEEDS_FOLLOW_UP', 'PENDING_APPROVAL'];
+    const inProgress = items.filter((item) => inProgressStatuses.includes(item.executionStatus)).length;
+    const overdue = items.filter((item) => item.executionStatus === 'OVERDUE').length;
+    const notStarted = Math.max(0, items.length - completed - inProgress - overdue);
+    const byDepartment = [...new Set(items.map((item) => item.responsibleDepartmentName || 'تعیین نشده'))].map((name) => ({ name, count: items.filter((item) => (item.responsibleDepartmentName || 'تعیین نشده') === name).length, completed: items.filter((item) => (item.responsibleDepartmentName || 'تعیین نشده') === name && item.executionStatus === 'APPROVED_CLOSED').length }));
+    const byMeeting = [...new Set(items.map((item) => item.meetingId))].map((id) => ({ id, name: items.find((item) => item.meetingId === id)?.meetingTitle || id, count: items.filter((item) => item.meetingId === id).length }));
+    return apiClient.simulateNetwork({ total: items.length, completed, inProgress, notStarted, overdue, fulfillmentPercent: items.length ? Math.round((completed / items.length) * 100) : 0, byDepartment, byMeeting, importantOrOverdue: items.filter((item) => item.executionStatus === 'OVERDUE' || ['URGENT', 'CRITICAL'].includes(item.priority)) }, 140);
   }
 }
 

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { resolutionService } from '../../services/resolutionService';
 import { meetingService } from '../../services/meetingService';
-import { Resolution, ActivityLog, Meeting } from '../../types';
+import { boardSecretariatService } from '../../services/boardSecretariatService';
+import { Resolution, ActivityLog, Meeting, ResolutionNotice } from '../../types';
 import { 
   X, 
   FileCheck2, 
@@ -47,6 +48,7 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSigning, setIsSigning] = useState(false);
+  const [notices, setNotices] = useState<ResolutionNotice[]>([]);
 
   // Complete task form state
   const [completionNotes, setCompletionNotes] = useState('');
@@ -73,8 +75,9 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
       if (resRes.isSuccess && resRes.data) {
         setResolution(resRes.data);
-        const meetingRes = await meetingService.getMeetingById(resRes.data.meetingId);
+        const [meetingRes, noticeRes] = await Promise.all([meetingService.getMeetingById(resRes.data.meetingId), boardSecretariatService.getNotices(undefined, resRes.data.id)]);
         setMeeting(meetingRes.isSuccess ? meetingRes.data : null);
+        setNotices(noticeRes.data);
       }
       if (logRes.isSuccess) {
         setLogs(logRes.data);
@@ -135,6 +138,11 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
     } finally {
       setIsSigning(false);
     }
+  };
+
+  const handleNoticeReceived = async (noticeId: string) => {
+    try { await boardSecretariatService.markNoticeReceived(noticeId, currentUser); showToast('دریافت ابلاغیه', 'دریافت ابلاغیه ثبت شد.', 'success'); await loadResolutionData(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ثبت دریافت انجام نشد.', 'error'); }
   };
 
   const handleCompleteTask = async () => {
@@ -368,6 +376,12 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
               <div className="space-y-2"><div className="font-bold text-slate-700">گزارش‌های ثبت‌شده</div>{[...(resolution.progressReports || [])].reverse().map((report) => <div key={report.id} className="p-3 border border-slate-200 rounded-2xl bg-slate-50"><div className="flex flex-wrap justify-between gap-2"><strong className="text-slate-800">{toPersianDigits(report.progressPercent)}٪ — {report.reporterName}</strong><span className="text-slate-400">{toPersianDigits(report.reportDateJalali)}، {toPersianDigits(report.reportTimeString)}</span></div><p className="mt-1 text-slate-700">{report.actionDescription}</p>{report.obstacles && <p className="mt-1 text-orange-700">موانع: {report.obstacles}</p>}{report.attachments.length > 0 && <span className="block mt-1 text-blue-700">{toPersianDigits(report.attachments.length)} مستند پیوست</span>}</div>)}</div>
             </section>
           )}
+
+          <section className="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-3">
+            <h4 className="font-extrabold text-slate-900">پرونده و زنجیره سوابق مصوبه</h4>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold"><span className="px-3 py-1.5 bg-white border rounded-xl">پیشنهاد اولیه {meeting?.agendaItems.find((item) => item.id === resolution.agendaItemId)?.sourceProposalId ? `(${meeting.agendaItems.find((item) => item.id === resolution.agendaItemId)?.sourceProposalId})` : ''}</span><span>←</span><span className="px-3 py-1.5 bg-white border rounded-xl">دستورکار {resolution.agendaItemId || '—'}</span><span>←</span><span className="px-3 py-1.5 bg-white border rounded-xl">{resolution.meetingNumber}</span><span>←</span><span className="px-3 py-1.5 bg-white border rounded-xl">{resolution.resolutionNumber}</span><span>←</span><span className="px-3 py-1.5 bg-white border rounded-xl">{notices.length ? `${toPersianDigits(notices.length)} ابلاغیه` : 'در انتظار ابلاغ'}</span><span>←</span><span className="px-3 py-1.5 bg-white border rounded-xl">{toPersianDigits(resolution.progressPercent || 0)}٪ اجرا</span></div>
+            {notices.length > 0 && <div className="space-y-2">{notices.map((notice) => <div key={notice.id} className="p-3 bg-white border border-blue-200 rounded-xl flex flex-wrap items-center justify-between gap-2"><div><strong className="text-blue-900">{notice.noticeNumber}</strong><span className="block text-[10px] text-slate-500">{notice.recipientName} — {notice.recipientDepartment} — {toPersianDigits(notice.dateJalali)}</span></div><div className="flex items-center gap-2"><span className={`text-[10px] font-bold px-2 py-1 rounded-full ${notice.status === 'RECEIVED' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>{notice.status === 'RECEIVED' ? 'دریافت شده' : 'ارسال شده'}</span>{notice.status === 'SENT' && (currentUser.role === 'ADMIN' || notice.recipientName === currentUser.fullName || notice.recipientDepartment === currentUser.departmentName) && <button onClick={() => handleNoticeReceived(notice.id)} className="text-[10px] bg-teal-700 text-white px-2.5 py-1.5 rounded-lg">ثبت دریافت</button>}</div></div>)}</div>}
+          </section>
 
           {/* Texts & Instructions */}
           <div className="space-y-3">

@@ -49,10 +49,12 @@ class MockUserService implements IUserService {
   }
 
   public async deleteUser(id: string): Promise<ApiResponse<boolean>> {
-    const initialLen = this.users.length;
-    this.users = this.users.filter((user) => user.id !== id);
+    const user = this.users.find((item) => item.id === id);
+    if (!user) return apiClient.simulateNetwork(false, 100);
+    user.isActive = false;
+    user.archivedAt = new Date().toISOString();
     saveLocalCollection('users', this.users);
-    return apiClient.simulateNetwork(this.users.length < initialLen, 100);
+    return apiClient.simulateNetwork(true, 100);
   }
 
   public async getDepartments(): Promise<ApiResponse<Department[]>> {

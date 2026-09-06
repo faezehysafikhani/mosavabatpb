@@ -7,7 +7,11 @@ export type LocalCollectionKey =
   | 'tasks'
   | 'approvals'
   | 'activityLogs'
-  | 'notifications';
+  | 'notifications'
+  | 'boardMinutes'
+  | 'resolutionNotices'
+  | 'governanceAudit'
+  | 'outcomeLetters';
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 

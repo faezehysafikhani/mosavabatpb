@@ -46,7 +46,7 @@ export interface CreateResolutionDto {
 }
 
 export interface IResolutionService {
-  getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; relatedUserId?: string }): Promise<ApiResponse<PagedResult<Resolution>>>;
+  getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; relatedUserId?: string; proposerDepartmentName?: string }): Promise<ApiResponse<PagedResult<Resolution>>>;
   getResolutionById(id: string): Promise<ApiResponse<Resolution | null>>;
   createResolution(dto: CreateResolutionDto): Promise<ApiResponse<Resolution>>;
   updateResolution(id: string, dto: Partial<Resolution>): Promise<ApiResponse<Resolution>>;
@@ -57,6 +57,8 @@ export interface IResolutionService {
   rejectVerificationStep(resolutionId: string, stepNumber: number, rejectionReason: string, approverName: string): Promise<ApiResponse<Resolution>>;
   signResolution(resolutionId: string, signerUserId: string): Promise<ApiResponse<Resolution>>;
   updateExecutionProgress(resolutionId: string, report: ResolutionProgressReport): Promise<ApiResponse<Resolution>>;
+  markMeetingMinutesFinalized(meetingId: string): Promise<ApiResponse<number>>;
+  releaseMeetingResolutionsForExecution(meetingId: string): Promise<ApiResponse<number>>;
 }
 
 class MockResolutionService implements IResolutionService {
@@ -112,7 +114,7 @@ class MockResolutionService implements IResolutionService {
     saveLocalCollection('tasks', tasks);
   }
 
-  public async getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; requiresVerification?: boolean; relatedUserId?: string }): Promise<ApiResponse<PagedResult<Resolution>>> {
+  public async getResolutions(params?: ApiFilterParams & { approvalStatus?: string; executionStatus?: string; meetingId?: string; requiresVerification?: boolean; relatedUserId?: string; proposerDepartmentName?: string }): Promise<ApiResponse<PagedResult<Resolution>>> {
     let filtered = [...this.resolutions];
 
     if (params?.relatedUserId) {
@@ -127,6 +129,9 @@ class MockResolutionService implements IResolutionService {
         (r) =>
           r.topicTitle.toLowerCase().includes(term) ||
           r.resolutionNumber.toLowerCase().includes(term) ||
+          r.meetingNumber.toLowerCase().includes(term) ||
+          r.meetingTitle.toLowerCase().includes(term) ||
+          (r.letterNumber && r.letterNumber.toLowerCase().includes(term)) ||
           r.proposerName.toLowerCase().includes(term) ||
           (r.mainResponsibleName && r.mainResponsibleName.toLowerCase().includes(term)) ||
           (r.responsibleDepartmentName && r.responsibleDepartmentName.toLowerCase().includes(term))
@@ -149,10 +154,28 @@ class MockResolutionService implements IResolutionService {
       filtered = filtered.filter((r) => r.responsibleDepartmentId === params.departmentId);
     }
 
+    if (params?.proposerDepartmentName && params.proposerDepartmentName !== 'ALL') {
+      filtered = filtered.filter((r) => r.proposerDepartment === params.proposerDepartmentName);
+    }
+
+    const comparableDate = (value?: string) => {
+      const source = value?.includes('T') ? new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date(value)).replace(/[\u200e\u200f]/g, '') : (value || '');
+      return source.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))).replace(/\D/g, '');
+    };
+    if (params?.fromDateJalali) {
+      const from = comparableDate(params.fromDateJalali);
+      filtered = filtered.filter((r) => comparableDate(r.assignedDateJalali || r.createdAt) >= from);
+    }
+    if (params?.toDateJalali) {
+      const to = comparableDate(params.toDateJalali);
+      filtered = filtered.filter((r) => comparableDate(r.assignedDateJalali || r.createdAt) <= to);
+    }
+
     if (params?.requiresVerification !== undefined) {
       filtered = filtered.filter((r) => r.verificationConfig.requiresVerification === params.requiresVerification);
     }
 
+    filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const pageIndex = params?.pageIndex || 1;
     const pageSize = params?.pageSize || 10;
     const totalCount = filtered.length;
@@ -289,17 +312,17 @@ class MockResolutionService implements IResolutionService {
       resolution.executionStatus = resolution.signatureWorkflow.status;
     } else {
       resolution.signatureWorkflow.status = 'COMPLETED';
-      this.startExecution(resolution);
+      resolution.executionStatus = 'WAITING_MINUTES_SIGNATURE';
       this.activityLogs.unshift({
         id: `log-${Date.now()}-execution`,
         targetType: 'RESOLUTION',
         targetId: resolution.id,
-        action: 'تکمیل امضاها و آغاز فرآیند اجرای مصوبه',
+        action: 'تکمیل امضاهای مصوبه و انتظار برای صورت‌جلسه تجمیعی',
         actorName: currentStep.signerName,
         actorRole: currentStep.signerTitle,
         timestampJalali: currentStep.signedDateJalali,
         timeString: currentStep.signedTimeString,
-        details: `هر سه امضا تکمیل شد و مصوبه به ${resolution.mainResponsibleName || 'مسئول اجرا'} ارجاع گردید.`,
+        details: 'هر سه امضای مصوبه تکمیل شد؛ اجرای آن پس از نهایی‌شدن صورت‌جلسه تجمیعی و صدور ابلاغیه آغاز می‌شود.',
         badgeColor: 'blue',
       });
     }
@@ -346,11 +369,35 @@ class MockResolutionService implements IResolutionService {
     return apiClient.simulateNetwork(resolution, 140);
   }
 
-  public async deleteResolution(id: string): Promise<ApiResponse<boolean>> {
-    const initialLen = this.resolutions.length;
-    this.resolutions = this.resolutions.filter((r) => r.id !== id);
+  public async markMeetingMinutesFinalized(meetingId: string): Promise<ApiResponse<number>> {
+    const eligible = this.resolutions.filter((item) => item.meetingId === meetingId && item.signatureWorkflow?.status === 'COMPLETED' && item.executionStatus === 'WAITING_MINUTES_SIGNATURE');
+    eligible.forEach((resolution) => {
+      resolution.executionStatus = 'WAITING_NOTIFICATION';
+      this.activityLogs.unshift({ id: `log-minutes-${resolution.id}-${Date.now()}`, targetType: 'RESOLUTION', targetId: resolution.id, action: 'نهایی‌شدن صورت‌جلسه تجمیعی', actorName: 'دبیرخانه هیأت‌مدیره', actorRole: 'دبیرخانه', timestampJalali: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()).replace(/[\u200e\u200f]/g, ''), timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), details: 'مصوبه آماده تهیه و ارسال ابلاغیه رسمی شد.', badgeColor: 'purple' });
+    });
     this.persist();
-    return apiClient.simulateNetwork(this.resolutions.length < initialLen, 150);
+    return apiClient.simulateNetwork(eligible.length, 100);
+  }
+
+  public async releaseMeetingResolutionsForExecution(meetingId: string): Promise<ApiResponse<number>> {
+    const eligible = this.resolutions.filter((item) => item.meetingId === meetingId && item.executionStatus === 'WAITING_NOTIFICATION');
+    eligible.forEach((resolution) => {
+      resolution.executionStatus = 'NOTIFIED';
+      this.activityLogs.unshift({ id: `log-notice-${resolution.id}-${Date.now()}`, targetType: 'RESOLUTION', targetId: resolution.id, action: 'ابلاغ رسمی مصوبه', actorName: 'دبیرخانه هیأت‌مدیره', actorRole: 'دبیرخانه', timestampJalali: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()).replace(/[\u200e\u200f]/g, ''), timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), details: `ابلاغیه صادر و مصوبه به ${resolution.mainResponsibleName || 'مسئول اجرا'} ارجاع شد.`, badgeColor: 'teal' });
+      this.startExecution(resolution);
+    });
+    this.persist();
+    return apiClient.simulateNetwork(eligible.length, 120);
+  }
+
+  public async deleteResolution(id: string): Promise<ApiResponse<boolean>> {
+    const resolution = this.resolutions.find((item) => item.id === id);
+    if (!resolution) return apiClient.simulateNetwork(false, 150);
+    const previousStatus = resolution.executionStatus;
+    resolution.executionStatus = 'ARCHIVED';
+    this.activityLogs.unshift({ id: `log-archive-${id}-${Date.now()}`, targetType: 'RESOLUTION', targetId: id, action: 'بایگانی مصوبه بدون حذف اطلاعات', actorName: 'سامانه', actorRole: 'سیستم', timestampJalali: new Intl.DateTimeFormat('fa-IR-u-ca-persian').format(new Date()).replace(/[\u200e\u200f]/g, ''), timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), details: `وضعیت قبلی: ${previousStatus}`, badgeColor: 'purple' });
+    this.persist();
+    return apiClient.simulateNetwork(true, 150);
   }
 
   public async getResolutionActivityLogs(resolutionId: string): Promise<ApiResponse<ActivityLog[]>> {
