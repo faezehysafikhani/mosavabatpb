@@ -151,6 +151,12 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
     } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'مدعو ثبت نشد.', 'error'); }
   };
 
+  const handleEndMeeting = async () => {
+    if (!window.confirm('آیا از پایان این جلسه اطمینان دارید؟')) return;
+    try { await meetingService.endMeeting(meetingId, currentUser); showToast('پایان جلسه', 'جلسه با موفقیت خاتمه یافت. مصوبات آن به‌طور مستقل به روند اجرای خود ادامه می‌دهند.', 'success'); triggerRefresh(); }
+    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'خاتمه جلسه انجام نشد.', 'error'); }
+  };
+
   const handleSendInvitations = async () => {
     try { await meetingService.sendInvitations(meetingId, currentUser); showToast('ارسال دعوتنامه', 'دعوتنامه اعضا و مدعوین ارسال و در تاریخچه ثبت شد.', 'success'); triggerRefresh(); }
     catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ارسال انجام نشد.', 'error'); }
@@ -206,6 +212,15 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
         <div className="flex flex-wrap items-center gap-2">
           {isSecretariat && meeting.status === 'AGENDA_RETURNED' && <button onClick={async () => { await meetingService.submitAgenda(meeting.id, currentUser); triggerRefresh(); }} className="flex items-center gap-1.5 bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded-xl"><RotateCcw className="w-4 h-4" />ارسال مجدد دستورکار</button>}
           {isSecretariat && meeting.status === 'READY_FOR_INVITATION' && <button onClick={handleSendInvitations} className="flex items-center gap-1.5 bg-violet-700 text-white font-bold text-xs py-2 px-4 rounded-xl"><Send className="w-4 h-4" />ارسال دعوتنامه‌ها</button>}
+          {(isCeo || isSecretariat) && meeting.status === 'IN_PROGRESS' && (
+            <button
+              onClick={handleEndMeeting}
+              className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>پایان جلسه</span>
+            </button>
+          )}
           {canCreateResolution && ['IN_PROGRESS', 'HELD'].includes(meeting.status) && (
             <button
               onClick={() => openCreateResolutionModal({ meetingId: meeting.id })}

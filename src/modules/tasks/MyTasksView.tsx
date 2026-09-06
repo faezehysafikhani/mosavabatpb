@@ -12,12 +12,13 @@ import {
   FileText,
   User,
   TrendingUp,
-  Paperclip
+  Paperclip,
+  X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { taskService } from '../../services/taskService';
-import { Task } from '../../types';
-import { toPersianDigits, getPriorityMeta } from '../../utils/formatters';
+import { Task, Attachment } from '../../types';
+import { toPersianDigits, getPriorityMeta, formatFileSize } from '../../utils/formatters';
 import { ResolutionDetailModal } from '../resolutions/ResolutionDetailModal';
 import { ListViewActions, ListViewMode } from '../../components/common/ListViewActions';
 import { exportListToPdf } from '../../utils/pdfExport';
@@ -36,6 +37,7 @@ export const MyTasksView: React.FC = () => {
   // Complete task modal state
   const [activeCompletingTask, setActiveCompletingTask] = useState<Task | null>(null);
   const [completionNotes, setCompletionNotes] = useState('');
+  const [completionFiles, setCompletionFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeProgressTask, setActiveProgressTask] = useState<Task | null>(null);
   const [progressPercent, setProgressPercent] = useState(0);
@@ -70,6 +72,7 @@ export const MyTasksView: React.FC = () => {
     e.stopPropagation();
     setActiveCompletingTask(task);
     setCompletionNotes('');
+    setCompletionFiles([]);
   };
 
   const handleSubmitTaskCompletion = async () => {
@@ -81,7 +84,9 @@ export const MyTasksView: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const res = await taskService.submitTaskCompletion(activeCompletingTask.id, completionNotes);
+      const uploadDate = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/[‎‏]/g, '');
+      const attachments: Attachment[] = completionFiles.map((file, index) => ({ id: `completion-attachment-${Date.now()}-${index}`, fileName: file.name, fileSizeBytes: file.size, fileExtension: file.name.split('.').pop() || 'file', uploadDate, uploadedBy: currentUser.fullName, downloadUrl: '#' }));
+      const res = await taskService.submitTaskCompletion(activeCompletingTask.id, completionNotes, attachments);
       if (res.isSuccess) {
         showToast(
           'اتمام وظیفه',
@@ -324,6 +329,29 @@ export const MyTasksView: React.FC = () => {
               placeholder="مثال: پیاده‌سازی زیرساخت تکمیل گردید، تست‌های امنیتی اخذ شد و گزارش به پیوست ضمیمه گردید..."
               className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer w-fit">
+                <Paperclip className="w-4 h-4" />
+                <span>افزودن فایل پیوست</span>
+                <input type="file" multiple className="hidden" onChange={(e) => setCompletionFiles((prev) => [...prev, ...Array.from(e.target.files || [])])} />
+              </label>
+              {completionFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  {completionFiles.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 p-2 bg-white border border-slate-200 rounded-xl text-[11px]">
+                      <span className="font-bold text-slate-700 truncate">{file.name}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-slate-400">{formatFileSize(file.size)}</span>
+                        <button type="button" onClick={() => setCompletionFiles((prev) => prev.filter((_, i) => i !== index))} className="text-slate-400 hover:text-rose-600 cursor-pointer" title="حذف">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button

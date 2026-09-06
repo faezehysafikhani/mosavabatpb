@@ -467,6 +467,11 @@ class MockResolutionService implements IResolutionService {
       });
     } else {
       res.executionStatus = 'APPROVED_CLOSED';
+      // The resolution is genuinely finished here (no verification stands
+      // between it and closure) — keep progressPercent in sync with that
+      // real terminal state instead of leaving it at whatever the last
+      // progress report said (or undefined/0 if none was ever submitted).
+      res.progressPercent = 100;
       this.activityLogs.unshift({
         id: `log-${Date.now()}`,
         targetType: 'RESOLUTION',
@@ -488,6 +493,7 @@ class MockResolutionService implements IResolutionService {
       task.status = requiresVerif ? 'PENDING_APPROVAL' : 'CLOSED';
       task.completionNotes = completionNotes;
       task.completionDateJalali = '۱۴۰۳/۰۶/۲۸';
+      if (!requiresVerif) task.progressPercent = 100;
       saveLocalCollection('tasks', tasks);
     }
 
@@ -512,6 +518,9 @@ class MockResolutionService implements IResolutionService {
     }
 
     res.executionStatus = 'APPROVED_CLOSED';
+    // Final sign-off closes the resolution for real — sync progress to 100%
+    // so it can never show "Completed" alongside a stale/zero percentage.
+    res.progressPercent = 100;
     this.activityLogs.unshift({
       id: `log-${Date.now()}`,
       targetType: 'RESOLUTION',
@@ -535,6 +544,7 @@ class MockResolutionService implements IResolutionService {
     const task = tasks.find((t) => t.resolutionId === resolutionId);
     if (task) {
       task.status = 'CLOSED';
+      task.progressPercent = 100;
       saveLocalCollection('tasks', tasks);
     }
 

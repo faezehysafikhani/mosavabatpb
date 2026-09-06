@@ -1588,6 +1588,7 @@ export const mockActivityLogs: ActivityLog[] = [
 export const mockNotifications: AppNotification[] = [
   {
     id: 'notif-1',
+    recipientUserId: 'user-10',
     title: 'ارجاع وظیفه جدید',
     message: 'مصوبه شماره ۹۸ (پیاده‌سازی SSO) با مهلت ۱۴۰۳/۰۷/۱۵ برای شما ارجاع گردید.',
     dateJalali: '۱۴۰۳/۰۶/۱۱',
@@ -1599,6 +1600,7 @@ export const mockNotifications: AppNotification[] = [
   },
   {
     id: 'notif-2',
+    recipientUserId: 'user-2',
     title: 'درخواست صحه‌گذاری مصوبه',
     message: 'گزارش انجام مصوبه شماره ۱۰۷ (اتصال به پنجره ملی) جهت صحه‌گذاری و تایید شما ارسال شد.',
     dateJalali: '۱۴۰۳/۰۶/۲۸',
@@ -1610,6 +1612,7 @@ export const mockNotifications: AppNotification[] = [
   },
   {
     id: 'notif-3',
+    recipientUserId: 'user-11',
     title: 'هشدار موعد مقرر',
     message: 'مهلت انجام مصوبه شماره ۱۰۳ (ارزیابی ۳۶۰ درجه) منقضی شده و وضعیت به عقب‌افتاده تغییر کرد.',
     dateJalali: '۱۴۰۳/۰۶/۲۶',
@@ -1621,6 +1624,7 @@ export const mockNotifications: AppNotification[] = [
   },
   {
     id: 'notif-4',
+    recipientUserId: 'user-9',
     title: 'تصویب و خاتمه مصوبه',
     message: 'مصوبه شماره ۱۰۰ (تجهیز دیتاسنتر با سرورها) تایید نهایی شد و با موفقیت خاتمه یافت.',
     dateJalali: '۱۴۰۳/۰۶/۲۲',

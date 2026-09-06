@@ -79,6 +79,7 @@ class MockTaskService implements ITaskService {
 
     // Refresh task status based on whether verification was required
     task.status = task.requiresVerification ? 'PENDING_APPROVAL' : 'CLOSED';
+    if (!task.requiresVerification) task.progressPercent = 100;
     saveLocalCollection('tasks', tasks);
 
     return apiClient.simulateNetwork(task, 200);

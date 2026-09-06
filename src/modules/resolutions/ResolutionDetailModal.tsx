@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { resolutionService } from '../../services/resolutionService';
 import { meetingService } from '../../services/meetingService';
 import { boardSecretariatService } from '../../services/boardSecretariatService';
-import { Resolution, ActivityLog, Meeting, ResolutionNotice } from '../../types';
+import { Resolution, ActivityLog, Meeting, ResolutionNotice, Attachment } from '../../types';
 import { 
   X, 
   FileCheck2, 
@@ -26,8 +26,9 @@ import {
   toPersianDigits, 
   getResolutionApprovalMeta, 
   getResolutionExecutionMeta, 
-  getPriorityMeta, 
-  getVerificationStepStatusMeta 
+  getPriorityMeta,
+  getVerificationStepStatusMeta,
+  formatFileSize
 } from '../../utils/formatters';
 import { TimelineView } from '../../components/common/TimelineView';
 import { AttachmentList } from '../../components/common/AttachmentList';
@@ -52,6 +53,7 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
   // Complete task form state
   const [completionNotes, setCompletionNotes] = useState('');
+  const [completionFiles, setCompletionFiles] = useState<File[]>([]);
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
 
   // Verification approval/rejection state
@@ -153,7 +155,9 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
     setIsSubmittingCompletion(true);
     try {
-      const res = await resolutionService.completeResolutionTask(resolution.id, completionNotes);
+      const uploadDate = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/[‎‏]/g, '');
+      const attachments: Attachment[] = completionFiles.map((file, index) => ({ id: `completion-attachment-${Date.now()}-${index}`, fileName: file.name, fileSizeBytes: file.size, fileExtension: file.name.split('.').pop() || 'file', uploadDate, uploadedBy: currentUser.fullName, downloadUrl: '#' }));
+      const res = await resolutionService.completeResolutionTask(resolution.id, completionNotes, attachments);
       if (res.isSuccess) {
         showToast(
           'ثبت اتمام وظیفه',
@@ -162,6 +166,8 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
             : 'وظیفه تکمیل و مصوبه مستقیماً خاتمه یافت.',
           'success'
         );
+        setCompletionNotes('');
+        setCompletionFiles([]);
         triggerRefresh();
         loadResolutionData();
       }
@@ -480,6 +486,29 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
                 placeholder="شرح کامل گزارش اتمام، شماره نامه‌های صادره یا لینک‌های مرتبط..."
                 className="w-full text-xs p-3 bg-white border border-teal-200 rounded-2xl focus:ring-2 focus:ring-teal-500 focus:outline-none"
               />
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs p-2.5 bg-white border border-teal-200 rounded-xl cursor-pointer w-fit">
+                  <Paperclip className="w-4 h-4" />
+                  <span>افزودن فایل پیوست</span>
+                  <input type="file" multiple className="hidden" onChange={(e) => setCompletionFiles((prev) => [...prev, ...Array.from(e.target.files || [])])} />
+                </label>
+                {completionFiles.length > 0 && (
+                  <div className="space-y-1.5">
+                    {completionFiles.map((file, index) => (
+                      <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 p-2 bg-white border border-teal-200 rounded-xl text-[11px]">
+                        <span className="font-bold text-slate-700 truncate">{file.name}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-slate-400">{formatFileSize(file.size)}</span>
+                          <button type="button" onClick={() => setCompletionFiles((prev) => prev.filter((_, i) => i !== index))} className="text-slate-400 hover:text-rose-600 cursor-pointer" title="حذف">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="flex justify-end">
                 <button

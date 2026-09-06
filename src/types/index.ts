@@ -565,6 +565,7 @@ export interface ActivityLog {
 
 export interface AppNotification {
   id: string;
+  recipientUserId: string;
   title: string;
   message: string;
   dateJalali: string;

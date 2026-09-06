@@ -31,6 +31,7 @@ export interface IMeetingService {
   removeAgendaItem(id: string, agendaItemId: string, reason: string, actor: User): Promise<ApiResponse<Meeting>>;
   reviewAgenda(id: string, decision: 'APPROVE' | 'RETURN', notes: string, actor: User): Promise<ApiResponse<Meeting>>;
   submitAgenda(id: string, actor: User): Promise<ApiResponse<Meeting>>;
+  endMeeting(id: string, actor: User): Promise<ApiResponse<Meeting>>;
   addGuest(id: string, guest: Omit<MeetingGuest, 'id' | 'invitationStatus'>, actor: User): Promise<ApiResponse<Meeting>>;
   sendInvitations(id: string, actor: User): Promise<ApiResponse<Meeting>>;
   markInvitationViewed(id: string, recipientId: string, actor: User): Promise<ApiResponse<Meeting>>;
@@ -249,6 +250,22 @@ class MockMeetingService implements IMeetingService {
     if (!meeting || meeting.status !== 'AGENDA_RETURNED') throw new Error('فقط دستورکار برگشتی قابل ارسال مجدد است');
     meeting.status = 'WAITING_FOR_CEO_APPROVAL';
     this.addHistory(meeting, actor, 'اصلاح و ارسال مجدد دستورکار برای مدیرعامل', 'AGENDA_RETURNED');
+    this.saveMeetingsData(meetings);
+    return apiClient.simulateNetwork(meeting, 120);
+  }
+
+  public async endMeeting(id: string, actor: User): Promise<ApiResponse<Meeting>> {
+    const isAuthorized = ['ADMIN', 'CEO', 'SECRETARY'].includes(actor.role);
+    const meetings = this.getMeetingsData();
+    const meeting = meetings.find((item) => item.id === id);
+    if (!meeting) throw new Error('جلسه یافت نشد');
+    if (!isAuthorized && actor.id !== meeting.secretaryId && actor.id !== meeting.organizerId) throw new Error('فقط مسئول مجاز جلسه می‌تواند آن را خاتمه دهد');
+    if (meeting.status !== 'IN_PROGRESS') throw new Error('فقط جلسه در حال برگزاری قابل خاتمه است');
+    // Ending the meeting only closes its own lifecycle. Resolutions created
+    // from it keep running their own independent workflow (execution,
+    // signatures, verification) untouched — see AppContext/ResolutionService.
+    meeting.status = 'HELD';
+    this.addHistory(meeting, actor, 'ثبت پایان جلسه', 'IN_PROGRESS');
     this.saveMeetingsData(meetings);
     return apiClient.simulateNetwork(meeting, 120);
   }

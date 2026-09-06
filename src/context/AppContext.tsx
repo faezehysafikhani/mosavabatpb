@@ -97,7 +97,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedResolutionId, setSelectedResolutionId] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [globalSearch, setGlobalSearch] = useState<string>('');
-  const [notifications, setNotifications] = useState<AppNotification[]>(loadLocalCollection('notifications', mockNotifications));
+  // The full store, across every user — never expose this directly; consumers
+  // must only ever see their own notifications (derived below).
+  const [allNotifications, setAllNotifications] = useState<AppNotification[]>(loadLocalCollection('notifications', mockNotifications));
   const [toasts, setToasts] = useState<ToastInfo[]>([]);
   const [isCreateMeetingOpen, setIsCreateMeetingOpen] = useState<boolean>(false);
   const [createMeetingInitialDate, setCreateMeetingInitialDate] = useState<string>('۱۴۰۳/۰۷/۰۵');
@@ -137,25 +139,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const today = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/[\u200e\u200f]/g, '');
-    const numeric = (value: string) => Number(value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))).replace(/\//g, ''));
-    const todayValue = numeric(today);
+    // Parses each Jalali date component separately and recombines them
+    // arithmetically (year*10000 + month*100 + day) so the comparison is a
+    // real calendar comparison, not a comparison of the display strings, and
+    // stays correct regardless of how the source string happens to be padded.
+    const toComparableDate = (value: string): number => {
+      const western = value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+      const match = western.match(/^(\d{1,4})\/(\d{1,2})\/(\d{1,2})$/);
+      if (!match) return 0;
+      const [, y, m, d] = match;
+      return Number(y) * 10000 + Number(m) * 100 + Number(d);
+    };
+    const todayValue = toComparableDate(today);
     const allTasks = loadLocalCollection('tasks', mockTasks);
     const overdueResolutionIds = new Set<string>();
-    allTasks.forEach((task) => { const deadline = numeric(task.deadlineJalali); if (deadline > 0 && !['CLOSED', 'COMPLETED', 'PENDING_APPROVAL'].includes(task.status) && deadline < todayValue) { task.status = 'OVERDUE'; overdueResolutionIds.add(task.resolutionId); } });
+    allTasks.forEach((task) => { const deadline = toComparableDate(task.deadlineJalali); if (deadline > 0 && !['CLOSED', 'COMPLETED', 'PENDING_APPROVAL'].includes(task.status) && deadline < todayValue) { task.status = 'OVERDUE'; overdueResolutionIds.add(task.resolutionId); } });
     if (overdueResolutionIds.size > 0) {
       saveLocalCollection('tasks', allTasks);
       const resolutions = loadLocalCollection('resolutions', mockResolutions);
       resolutions.forEach((resolution) => { if (overdueResolutionIds.has(resolution.id) && !['APPROVED_CLOSED', 'ARCHIVED'].includes(resolution.executionStatus)) resolution.executionStatus = 'OVERDUE'; });
       saveLocalCollection('resolutions', resolutions);
     }
+    // isOverdue = now > deadline && !isCompleted — restricted to the current
+    // user's own tasks, since a deadline notification only belongs to the
+    // person it's actually about.
     const tasks = allTasks.filter((task) => task.assignedToUserId === currentUser.id && !['CLOSED', 'COMPLETED', 'PENDING_APPROVAL'].includes(task.status));
-    setNotifications((previous) => {
+    setAllNotifications((previous) => {
       const next = [...previous];
       tasks.forEach((task) => {
-        const deadline = numeric(task.deadlineJalali); const overdue = deadline < todayValue; const near = !overdue && Math.floor(deadline / 100) === Math.floor(todayValue / 100) && deadline - todayValue <= 7;
+        const deadline = toComparableDate(task.deadlineJalali); const overdue = deadline > 0 && deadline < todayValue; const near = !overdue && Math.floor(deadline / 100) === Math.floor(todayValue / 100) && deadline - todayValue <= 7;
         if (!overdue && !near) return;
         const id = `deadline-${task.id}-${overdue ? 'overdue' : 'near'}`;
-        if (!next.some((item) => item.id === id)) next.unshift({ id, title: overdue ? 'تأخیر در اجرای مصوبه' : 'نزدیک‌شدن مهلت مصوبه', message: `${task.resolutionNumber} — ${task.resolutionTitle} — مهلت ${task.deadlineJalali}`, dateJalali: today, timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), isRead: false, type: overdue ? 'DEADLINE' : 'FOLLOW_UP', targetRoute: 'tasks', targetResolutionId: task.resolutionId });
+        if (!next.some((item) => item.id === id)) next.unshift({ id, recipientUserId: currentUser.id, title: overdue ? 'تأخیر در اجرای مصوبه' : 'نزدیک‌شدن مهلت مصوبه', message: `${task.resolutionNumber} — ${task.resolutionTitle} — مهلت ${task.deadlineJalali}`, dateJalali: today, timeString: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }), isRead: false, type: overdue ? 'DEADLINE' : 'FOLLOW_UP', targetRoute: 'tasks', targetResolutionId: task.resolutionId });
       });
       saveLocalCollection('notifications', next); return next;
     });
@@ -181,17 +196,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
 
+  // Every mutation below is scoped to currentUser.id: a notification is only
+  // ever marked read/cleared for the person it actually belongs to, so one
+  // user's "mark all as read" (or "clear all") can never touch anyone else's.
   const markNotificationAsRead = (id: string) => {
-    setNotifications((prev) => {
-      const next = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+    setAllNotifications((prev) => {
+      const next = prev.map((n) => (n.id === id && n.recipientUserId === currentUser.id ? { ...n, isRead: true } : n));
       saveLocalCollection('notifications', next);
       return next;
     });
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications((prev) => {
-      const next = prev.map((n) => ({ ...n, isRead: true }));
+    setAllNotifications((prev) => {
+      const next = prev.map((n) => (n.recipientUserId === currentUser.id ? { ...n, isRead: true } : n));
       saveLocalCollection('notifications', next);
       return next;
     });
@@ -199,11 +217,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const clearAllNotifications = () => {
-    setNotifications([]);
-    saveLocalCollection('notifications', []);
+    setAllNotifications((prev) => {
+      const next = prev.filter((n) => n.recipientUserId !== currentUser.id);
+      saveLocalCollection('notifications', next);
+      return next;
+    });
     showToast('اعلان‌ها', 'تمامی اعلان‌ها پاک شدند.', 'info');
   };
 
+  // The only notifications ever exposed to consumers (Navbar, badge count,
+  // etc.) — filtered to the signed-in user, at the data layer, before any
+  // component gets a look at the full multi-user collection.
+  const notifications = allNotifications.filter((n) => n.recipientUserId === currentUser.id);
   const unreadNotificationsCount = notifications.filter((n) => !n.isRead).length;
 
   const showToast = (title: string, message: string, type: ToastInfo['type'] = 'success') => {
