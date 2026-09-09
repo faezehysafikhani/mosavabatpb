@@ -59,7 +59,8 @@ export type PermissionKey =
   | 'REJECT_RESOLUTION'
   | 'VIEW_REPORTS'
   | 'MANAGE_USERS'
-  | 'CREATE_USER';
+  | 'CREATE_USER'
+  | 'IMPORT_PROPOSALS_FROM_EXCEL';
 
 export interface User {
   id: string;
@@ -174,7 +175,16 @@ export interface Proposal {
   history?: WorkflowHistoryEntry[];
   updatedAt?: string;
   createdAt: string;
+  // Traceability only — never affects workflow. A proposal created via the
+  // Excel bulk-import path carries the originating automation letter's
+  // reference so it can later be matched back to that letter.
+  source?: ProposalSource;
+  sourceLetterNumber?: string;
+  sourceLetterDateJalali?: string;
+  sourceLetterSubject?: string;
 }
+
+export type ProposalSource = 'MANUAL' | 'EXCEL_IMPORT';
 
 export type MeetingStatus =
   | 'DRAFT'           // پیش‌نویس
