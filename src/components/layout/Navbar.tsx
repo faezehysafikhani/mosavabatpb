@@ -182,9 +182,9 @@ export const Navbar: React.FC = () => {
             className="flex items-center gap-2.5 cursor-pointer select-none"
           >
             <img
-              src="/pars-project.png"
-              alt="لوگوی Pars Project"
-              className="w-12 h-12 object-contain rounded-xl bg-white shrink-0 p-0.5 border border-slate-100"
+              src="/postbank.png"
+              alt="لوگوی مصوبات"
+              className="w-12 h-12 object-contain rounded-xl shrink-0 p-0.5 "
             />
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
