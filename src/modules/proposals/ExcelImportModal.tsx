@@ -1,14 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { FileSpreadsheet, X, UploadCloud, AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { FileSpreadsheet, X, UploadCloud, AlertTriangle, CheckCircle2, Loader2, Trash2, FileText, Plus } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { mockDepartments } from '../../mock/data';
 import { proposalService } from '../../services/proposalService';
 import {
   ProposalImportParseResult,
+  ProposalImportRow,
   parseProposalExcelFile,
   importValidProposalRows,
 } from '../../services/proposalExcelImportService';
-import { toPersianDigits } from '../../utils/formatters';
+import { toPersianDigits, formatFileSize } from '../../utils/formatters';
 
 interface ExcelImportModalProps {
   isOpen: boolean;
@@ -17,25 +18,33 @@ interface ExcelImportModalProps {
 }
 
 type ModalStep = 'UPLOAD' | 'PREVIEW' | 'RESULT';
+type FileStatus = 'PARSING' | 'READY' | 'ERROR';
+
+interface SelectedFileEntry {
+  clientId: string;
+  file: File;
+  status: FileStatus;
+  result?: ProposalImportParseResult;
+  error?: string;
+}
+
+let clientIdCounter = 0;
+const nextClientId = () => `xlsx-file-${Date.now()}-${clientIdCounter++}`;
 
 export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onClose, onImported }) => {
   const { currentUser, availableUsers, showToast } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<ModalStep>('UPLOAD');
-  const [isParsing, setIsParsing] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<SelectedFileEntry[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [parseResult, setParseResult] = useState<ProposalImportParseResult | null>(null);
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [importSummary, setImportSummary] = useState<{ imported: number; skipped: number } | null>(null);
+  const [importSummary, setImportSummary] = useState<{ imported: number; skipped: number; totalRows: number } | null>(null);
 
   if (!isOpen) return null;
 
   const reset = () => {
     setStep('UPLOAD');
-    setParseResult(null);
-    setParseError(null);
+    setSelectedFiles([]);
     setImportSummary(null);
-    setIsParsing(false);
     setIsImporting(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -45,9 +54,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
     onClose();
   };
 
-  const handleFileSelected = async (file: File) => {
-    setParseError(null);
-    setIsParsing(true);
+  const parseOneFile = async (clientId: string, file: File) => {
     try {
       const existingProposalsRes = await proposalService.getProposals({ pageSize: 1000 });
       const result = await parseProposalExcelFile(file, {
@@ -55,39 +62,77 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
         users: availableUsers,
         existingProposals: existingProposalsRes.isSuccess ? existingProposalsRes.data.items : [],
       });
-      setParseResult(result);
-      setStep('PREVIEW');
+      setSelectedFiles((prev) => prev.map((entry) => (entry.clientId === clientId ? { ...entry, status: 'READY', result } : entry)));
     } catch (error) {
-      setParseError(error instanceof Error ? error.message : 'فایل قابل پردازش نیست.');
-    } finally {
-      setIsParsing(false);
+      const message = error instanceof Error ? error.message : 'فایل قابل پردازش نیست.';
+      setSelectedFiles((prev) => prev.map((entry) => (entry.clientId === clientId ? { ...entry, status: 'ERROR', error: message } : entry)));
     }
   };
 
+  const isDuplicateFile = (file: File) =>
+    selectedFiles.some((entry) => entry.file.name === file.name && entry.file.size === file.size);
+
+  const addFiles = (files: FileList | File[]) => {
+    const incoming = Array.from(files);
+    const toAdd: SelectedFileEntry[] = [];
+    incoming.forEach((file) => {
+      if (!/\.xlsx$/i.test(file.name)) {
+        showToast('خطا', `فایل «${file.name}» فرمت xlsx. ندارد و اضافه نشد.`, 'error');
+        return;
+      }
+      if (isDuplicateFile(file) || toAdd.some((entry) => entry.file.name === file.name && entry.file.size === file.size)) {
+        showToast('فایل تکراری', `فایل «${file.name}» قبلاً به لیست اضافه شده است.`, 'warning');
+        return;
+      }
+      toAdd.push({ clientId: nextClientId(), file, status: 'PARSING' });
+    });
+    if (toAdd.length === 0) return;
+    setSelectedFiles((prev) => [...prev, ...toAdd]);
+    toAdd.forEach((entry) => parseOneFile(entry.clientId, entry.file));
+  };
+
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileSelected(file);
+    if (e.target.files && e.target.files.length > 0) addFiles(e.target.files);
+    e.target.value = '';
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFileSelected(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
+  };
+
+  const handleRemoveFile = (clientId: string) => {
+    setSelectedFiles((prev) => prev.filter((entry) => entry.clientId !== clientId));
+  };
+
+  const isAnyParsing = selectedFiles.some((entry) => entry.status === 'PARSING');
+  const readyFiles = selectedFiles.filter((entry) => entry.status === 'READY' && entry.result);
+
+  // Flattened view across every successfully-parsed file, each row tagged
+  // with its source file name for the combined preview table.
+  const combinedRows: { fileName: string; row: ProposalImportRow }[] = readyFiles.flatMap((entry) =>
+    (entry.result?.rows || []).map((row) => ({ fileName: entry.file.name, row }))
+  );
+  const combinedValidCount = combinedRows.filter((r) => r.row.isValid).length;
+  const combinedInvalidCount = combinedRows.length - combinedValidCount;
+
+  const goToPreview = () => {
+    if (selectedFiles.length === 0 || isAnyParsing) return;
+    setStep('PREVIEW');
   };
 
   const handleConfirmImport = async () => {
-    if (!parseResult) return;
-    const validRows = parseResult.rows.filter((row) => row.isValid);
-    if (validRows.length === 0) return;
+    if (combinedValidCount === 0) return;
     const confirmed = window.confirm(
-      `${toPersianDigits(validRows.length)} پیشنهاد معتبر از این فایل وارد سامانه و برای بررسی مدیرعامل ارسال خواهند شد. آیا ادامه می‌دهید؟`
+      `${toPersianDigits(combinedValidCount)} پیشنهاد معتبر از این فایل‌ها وارد سامانه و برای بررسی مدیرعامل ارسال خواهند شد. آیا ادامه می‌دهید؟`
     );
     if (!confirmed) return;
 
     setIsImporting(true);
     try {
-      const summary = await importValidProposalRows(parseResult.rows, currentUser);
-      setImportSummary({ imported: summary.importedCount, skipped: parseResult.rows.length - summary.importedCount });
+      const allRows = combinedRows.map((r) => r.row);
+      const summary = await importValidProposalRows(allRows, currentUser);
+      setImportSummary({ imported: summary.importedCount, skipped: allRows.length - summary.importedCount, totalRows: allRows.length });
       setStep('RESULT');
       onImported();
       showToast('ورود از Excel', `${toPersianDigits(summary.importedCount)} پیشنهاد با موفقیت ثبت و به کارتابل مدیرعامل ارسال شد.`, 'success');
@@ -118,50 +163,78 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
 
         <div className="p-5 space-y-4 overflow-y-auto">
           {step === 'UPLOAD' && (
-            <div
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              className="border-2 border-dashed border-slate-200 hover:border-teal-400 rounded-2xl p-10 text-center bg-slate-50/50 transition-colors"
-            >
-              {isParsing ? (
-                <div className="flex flex-col items-center gap-2 text-slate-500">
-                  <Loader2 className="w-8 h-8 animate-spin text-teal-700" />
-                  <p className="text-xs font-bold">در حال خواندن و بررسی فایل...</p>
-                </div>
-              ) : (
-                <>
-                  <UploadCloud className="w-9 h-9 text-teal-700 mx-auto mb-3" />
-                  <p className="text-xs font-bold text-slate-700 mb-1">فایل Excel تکمیل‌شده را انتخاب یا رها کنید</p>
-                  <p className="text-[10px] text-slate-400 mb-4">فقط فرمت xlsx. پذیرفته می‌شود</p>
-                  <label className="bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer inline-flex items-center gap-1.5">
-                    <span>انتخاب فایل</span>
-                    <input ref={fileInputRef} type="file" accept=".xlsx" className="hidden" onChange={handleFileInputChange} />
-                  </label>
-                </>
-              )}
-              {parseError && (
-                <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-700 flex items-start gap-2 text-right">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{parseError}</span>
+            <div className="space-y-3">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                className="border-2 border-dashed border-slate-200 hover:border-teal-400 rounded-2xl p-8 text-center bg-slate-50/50 transition-colors"
+              >
+                <UploadCloud className="w-9 h-9 text-teal-700 mx-auto mb-3" />
+                <p className="text-xs font-bold text-slate-700 mb-1">یک یا چند فایل Excel تکمیل‌شده را انتخاب یا رها کنید</p>
+                <p className="text-[10px] text-slate-400 mb-4">فقط فرمت xlsx. پذیرفته می‌شود</p>
+                <label className="bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer inline-flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{selectedFiles.length > 0 ? 'افزودن فایل دیگر' : 'انتخاب فایل'}</span>
+                  <input ref={fileInputRef} type="file" accept=".xlsx" multiple className="hidden" onChange={handleFileInputChange} />
+                </label>
+              </div>
+
+              {selectedFiles.length > 0 && (
+                <div className="space-y-2">
+                  {selectedFiles.map((entry) => (
+                    <div key={entry.clientId} className="flex items-center justify-between gap-2.5 p-2.5 bg-white border border-slate-200/90 rounded-xl shadow-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="p-2 rounded-lg bg-teal-50 text-teal-700 shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate" title={entry.file.name}>{entry.file.name}</p>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                            <span>{formatFileSize(entry.file.size)}</span>
+                            <span>•</span>
+                            {entry.status === 'PARSING' && (
+                              <span className="flex items-center gap-1 text-slate-500"><Loader2 className="w-3 h-3 animate-spin" />در حال بررسی...</span>
+                            )}
+                            {entry.status === 'READY' && entry.result && (
+                              <span className={entry.result.invalidCount > 0 ? 'text-amber-600 font-bold' : 'text-emerald-700 font-bold'}>
+                                معتبر: {toPersianDigits(entry.result.validCount)} — دارای خطا: {toPersianDigits(entry.result.invalidCount)}
+                              </span>
+                            )}
+                            {entry.status === 'ERROR' && (
+                              <span className="text-rose-600 font-bold">{entry.error}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFile(entry.clientId)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors shrink-0 cursor-pointer"
+                        title="حذف فایل"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           )}
 
-          {step === 'PREVIEW' && parseResult && (
+          {step === 'PREVIEW' && (
             <div className="space-y-3">
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center gap-x-6 gap-y-1 text-xs">
-                <span className="font-bold text-slate-700">فایل: {parseResult.fileName}</span>
-                <span className="text-slate-500">تعداد ردیف‌ها: {toPersianDigits(parseResult.totalRows)}</span>
-                <span className="text-emerald-700 font-bold">معتبر: {toPersianDigits(parseResult.validCount)}</span>
-                <span className="text-rose-700 font-bold">دارای خطا: {toPersianDigits(parseResult.invalidCount)}</span>
+                <span className="font-bold text-slate-700">تعداد فایل: {toPersianDigits(readyFiles.length)}</span>
+                <span className="text-slate-500">تعداد ردیف‌ها: {toPersianDigits(combinedRows.length)}</span>
+                <span className="text-emerald-700 font-bold">معتبر: {toPersianDigits(combinedValidCount)}</span>
+                <span className="text-rose-700 font-bold">دارای خطا: {toPersianDigits(combinedInvalidCount)}</span>
               </div>
 
               <div className="overflow-x-auto border border-slate-100 rounded-xl">
-                <table className="w-full min-w-[760px] text-right text-[11px]">
+                <table className="w-full min-w-[820px] text-right text-[11px]">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 border-b border-slate-100">
                       <th className="py-2 px-2.5 font-semibold">ردیف</th>
+                      <th className="py-2 px-2.5 font-semibold">فایل</th>
                       <th className="py-2 px-2.5 font-semibold">عنوان</th>
                       <th className="py-2 px-2.5 font-semibold">سازمان</th>
                       <th className="py-2 px-2.5 font-semibold">ارائه‌دهنده</th>
@@ -171,10 +244,11 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {parseResult.rows.map((row) => (
-                      <tr key={row.rowNumber} className={row.isValid ? '' : 'bg-rose-50/40'}>
+                    {combinedRows.map(({ fileName, row }, i) => (
+                      <tr key={`${fileName}-${row.rowNumber}-${i}`} className={row.isValid ? '' : 'bg-rose-50/40'}>
                         <td className="py-2 px-2.5 text-slate-500">{toPersianDigits(row.rowNumber)}</td>
-                        <td className="py-2 px-2.5 text-slate-700 font-bold max-w-[160px] truncate" title={row.title}>{row.title || '—'}</td>
+                        <td className="py-2 px-2.5 text-slate-500 max-w-[120px] truncate" title={fileName}>{fileName}</td>
+                        <td className="py-2 px-2.5 text-slate-700 font-bold max-w-[140px] truncate" title={row.title}>{row.title || '—'}</td>
                         <td className="py-2 px-2.5 text-slate-600">{row.matchedDepartment?.name || row.proposerDepartmentNameRaw || '—'}</td>
                         <td className="py-2 px-2.5 text-slate-600">{row.matchedPresenter?.fullName || row.presenterNameRaw || '—'}</td>
                         <td className="py-2 px-2.5 text-slate-600">{toPersianDigits(row.letterNumber) || '—'}</td>
@@ -186,7 +260,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
                             <div className="space-y-0.5">
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">خطا</span>
                               <ul className="text-[10px] text-rose-600 list-disc pr-3">
-                                {row.errors.map((err, i) => <li key={i}>{err}</li>)}
+                                {row.errors.map((err, idx) => <li key={idx}>{err}</li>)}
                               </ul>
                             </div>
                           )}
@@ -199,12 +273,12 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
             </div>
           )}
 
-          {step === 'RESULT' && importSummary && parseResult && (
+          {step === 'RESULT' && importSummary && (
             <div className="text-center py-6 space-y-3">
               <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
               <p className="text-sm font-bold text-slate-800">ورود اطلاعات با موفقیت انجام شد.</p>
               <div className="text-xs text-slate-600 space-y-1">
-                <p>{toPersianDigits(parseResult.rows.length)} ردیف بررسی شد.</p>
+                <p>{toPersianDigits(importSummary.totalRows)} ردیف بررسی شد.</p>
                 <p className="text-emerald-700 font-bold">{toPersianDigits(importSummary.imported)} پیشنهاد ثبت و به کارتابل مدیرعامل ارسال شد.</p>
                 {importSummary.skipped > 0 && (
                   <p className="text-rose-700 font-bold">{toPersianDigits(importSummary.skipped)} ردیف به دلیل خطا یا تکراری بودن ثبت نشد.</p>
@@ -216,18 +290,28 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({ isOpen, onCl
 
         <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
           {step === 'UPLOAD' && (
-            <button onClick={handleClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer">
-              انصراف
-            </button>
+            <>
+              <button onClick={handleClose} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer">
+                انصراف
+              </button>
+              <button
+                onClick={goToPreview}
+                disabled={selectedFiles.length === 0 || isAnyParsing}
+                className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAnyParsing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>بررسی و پیش‌نمایش</span>
+              </button>
+            </>
           )}
           {step === 'PREVIEW' && (
             <>
-              <button onClick={reset} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer">
-                انتخاب فایل دیگر
+              <button onClick={() => setStep('UPLOAD')} className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold cursor-pointer">
+                بازگشت به مدیریت فایل‌ها
               </button>
               <button
                 onClick={handleConfirmImport}
-                disabled={isImporting || parseResult.validCount === 0}
+                disabled={isImporting || combinedValidCount === 0}
                 className="px-5 py-2.5 rounded-xl bg-teal-800 hover:bg-teal-700 text-white text-xs font-bold shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isImporting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

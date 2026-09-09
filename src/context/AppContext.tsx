@@ -3,6 +3,8 @@ import { User, AppNotification, PermissionKey } from '../types';
 import { mockUsers, mockNotifications, mockTasks, mockResolutions } from '../mock/data';
 import { userService } from '../services/userService';
 import { loadLocalCollection, loadLocalValue, saveLocalCollection, saveLocalValue } from '../services/localStore';
+import { getPermissionLabel } from '../utils/permissionLabels';
+import { AUTO_REFRESH_INTERVAL_MS } from '../config/constants';
 
 export type AppRoute =
   | 'dashboard'
@@ -178,6 +180,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
+  // Single, central background refetch: every list page already re-fetches
+  // its own data (unchanged loading-free fetch functions) whenever
+  // refreshTrigger changes, so one interval here is enough to keep every
+  // list/cartable page current without a full browser refresh — no page
+  // needs its own setInterval or polling constant.
+  useEffect(() => {
+    const intervalId = setInterval(triggerRefresh, AUTO_REFRESH_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, []);
+
   const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
     saveLocalValue('currentUserId', user.id);
@@ -304,10 +316,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUser = async (id: string, userData: Omit<User, 'id'>): Promise<User> => {
+    const previousPermissions = availableUsers.find((user) => user.id === id)?.permissions || [];
     const res = await userService.updateUser(id, userData);
     const updatedUser = res.data;
     setAvailableUsers((prev) => prev.map((user) => user.id === id ? updatedUser : user));
     if (currentUser.id === id) setCurrentUser(updatedUser);
+
+    // Real Event → real notification: only permissions actually newly granted
+    // by this save produce a "دسترسی جدید" notice, so it never gets confused
+    // with (or reuses the copy of) unrelated events like a validation request.
+    const newlyAssignedPermissions = (updatedUser.permissions || []).filter((p) => !previousPermissions.includes(p));
+    if (newlyAssignedPermissions.length > 0) {
+      const labels = newlyAssignedPermissions.map((p) => `«${getPermissionLabel(p)}»`).join('، ');
+      const today = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/[‎‏]/g, '');
+      const nowTime = new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+      const notification: AppNotification = {
+        id: `notif-permission-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        recipientUserId: id,
+        title: 'دسترسی جدید',
+        message: newlyAssignedPermissions.length === 1
+          ? `دسترسی ${labels} به حساب کاربری شما اضافه شد.`
+          : `دسترسی‌های ${labels} به حساب کاربری شما اضافه شد.`,
+        dateJalali: today,
+        timeString: nowTime,
+        isRead: false,
+        type: 'PERMISSION_ASSIGNED',
+        targetRoute: 'dashboard',
+      };
+      setAllNotifications((prev) => {
+        const next = [notification, ...prev];
+        saveLocalCollection('notifications', next);
+        return next;
+      });
+    }
+
     showToast('ویرایش کاربر', `اطلاعات کاربر «${updatedUser.fullName}» ذخیره شد.`, 'success');
     triggerRefresh();
     return updatedUser;

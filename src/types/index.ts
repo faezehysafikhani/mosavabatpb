@@ -581,7 +581,7 @@ export interface AppNotification {
   dateJalali: string;
   timeString: string;
   isRead: boolean;
-  type: 'ASSIGNMENT' | 'DEADLINE' | 'FOLLOW_UP' | 'APPROVAL_REQUEST' | 'APPROVED' | 'REJECTED' | 'MEETING';
+  type: 'ASSIGNMENT' | 'DEADLINE' | 'FOLLOW_UP' | 'APPROVAL_REQUEST' | 'APPROVED' | 'REJECTED' | 'MEETING' | 'PERMISSION_ASSIGNED';
   targetRoute?: string;
   targetResolutionId?: string;
 }
