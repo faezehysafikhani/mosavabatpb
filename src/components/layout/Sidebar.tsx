@@ -12,7 +12,8 @@ import {
   Clock,
   UserCheck,
   Settings,
-  Lightbulb
+  Lightbulb,
+  Archive
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
@@ -131,6 +132,11 @@ export const Sidebar: React.FC = () => {
               },
             ]
           : []),
+        {
+          route: 'archive' as AppRoute,
+          title: 'بایگانی',
+          icon: Archive,
+        },
       ],
     },
     {

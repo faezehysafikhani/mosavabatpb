@@ -37,7 +37,7 @@ export interface IProposalService {
   createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>>;
   reviewProposal(id: string, decision: 'APPROVED' | 'REJECTED', notes: string | undefined, actor: User): Promise<ApiResponse<Proposal>>;
   forwardToCeo(id: string): Promise<ApiResponse<Proposal>>;
-  recoverProposal(id: string): Promise<ApiResponse<Proposal>>;
+  recoverProposal(id: string, actor: User): Promise<ApiResponse<Proposal>>;
   returnForRevision(id: string, reason: string, actor: User): Promise<ApiResponse<Proposal>>;
   resubmitProposal(id: string, updates: { title: string; description: string; rationale?: string }, actor: User): Promise<ApiResponse<Proposal>>;
   decideWithoutBoard(id: string, decision: 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED' | 'CLOSED', notes: string, actor: User, order?: Proposal['ceoOrder']): Promise<ApiResponse<Proposal>>;
@@ -155,12 +155,19 @@ class MockProposalService implements IProposalService {
     return apiClient.simulateNetwork(proposal, 120);
   }
 
-  public async recoverProposal(id: string): Promise<ApiResponse<Proposal>> {
+  // Recovery is intentionally limited to NO_BOARD_REQUIRED: that decision
+  // means the CEO judged the proposal itself fine, just not worth a board
+  // agenda item, so re-opening it for review is reasonable. A REJECTED
+  // proposal was judged unfit on its merits — it must stay final and is not
+  // recoverable through this or any other action.
+  public async recoverProposal(id: string, actor: User): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new Error('مصوبه پیشنهادی یافت نشد');
-    if (proposal.status !== 'REJECTED') throw new Error('فقط موارد رد شده قابل بازیافت هستند');
+    if (proposal.status !== 'NO_BOARD_REQUIRED') throw new Error('فقط موارد «عدم نیاز به طرح در هیأت‌مدیره» قابل بازیافت هستند');
+    const previousStatus = proposal.status;
     proposal.status = 'PENDING_CEO_REVIEW';
+    this.addHistory(proposal, actor, 'بازیافت پیشنهاد و ارسال مجدد برای بررسی مدیرعامل', previousStatus);
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 120);
   }

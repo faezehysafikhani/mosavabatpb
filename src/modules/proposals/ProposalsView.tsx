@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck, FileSpreadsheet, Download
+  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck, FileSpreadsheet, Download, Undo2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { proposalService } from '../../services/proposalService';
@@ -11,7 +11,7 @@ import { ExcelImportModal } from './ExcelImportModal';
 import { downloadProposalExcelTemplate } from '../../services/proposalExcelImportService';
 
 type ProposalTab = 'OFFICE' | 'CEO' | 'MINE';
-type OfficeStatusFilter = 'APPROVED' | 'CONFIRMED_FOR_MEETING' | 'CONVERTED_TO_AGENDA' | 'ALL';
+type OfficeStatusFilter = 'APPROVED' | 'CONFIRMED_FOR_MEETING' | 'CONVERTED_TO_AGENDA' | 'NO_BOARD_REQUIRED' | 'ALL';
 
 const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
   PENDING_OFFICE_REVIEW: { label: 'در انتظار بررسی مسئول دفتر', bg: 'bg-sky-50 text-sky-700 border-sky-200' },
@@ -34,6 +34,7 @@ const OFFICE_FILTERS: { id: OfficeStatusFilter; label: string }[] = [
   { id: 'APPROVED', label: 'تایید جلسات تایید نشده' },
   { id: 'CONFIRMED_FOR_MEETING', label: 'تایید جلسه شده' },
   { id: 'CONVERTED_TO_AGENDA', label: 'تبدیل شده به جلسه' },
+  { id: 'NO_BOARD_REQUIRED', label: 'عدم نیاز به طرح (قابل بازیافت)' },
   { id: 'ALL', label: 'همه موارد' },
 ];
 
@@ -126,6 +127,16 @@ export const ProposalsView: React.FC = () => {
   const handleOrderStatus = async (proposal: Proposal, status: 'IN_PROGRESS' | 'COMPLETED') => {
     try { await proposalService.updateCeoOrderStatus(proposal.id, status, currentUser); showToast('پیگیری دستور', 'وضعیت اجرای دستور مدیرعامل ثبت شد.', 'success'); triggerRefresh(); }
     catch (error) { showToast('خطا', error instanceof Error ? error.message : 'وضعیت ثبت نشد.', 'error'); }
+  };
+
+  const handleRecoverProposal = async (proposal: Proposal) => {
+    try {
+      await proposalService.recoverProposal(proposal.id, currentUser);
+      showToast('بازیافت پیشنهاد', `«${proposal.title}» بازیافت شد و دوباره به کارتابل مدیرعامل ارسال شد.`, 'success');
+      triggerRefresh();
+    } catch (error) {
+      showToast('خطا', error instanceof Error ? error.message : 'بازیافت انجام نشد.', 'error');
+    }
   };
 
   const handleConfirmForMeeting = async () => {
@@ -253,6 +264,12 @@ export const ProposalsView: React.FC = () => {
                         <button onClick={() => handleOpenConfirm(p)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
                           <FileCheck2 className="w-3.5 h-3.5" />
                           <span>تبدیل به تایید جلسه</span>
+                        </button>
+                      )}
+                      {p.status === 'NO_BOARD_REQUIRED' && (
+                        <button onClick={() => handleRecoverProposal(p)} className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
+                          <Undo2 className="w-3.5 h-3.5" />
+                          <span>بازیافت</span>
                         </button>
                       )}
                     </td>

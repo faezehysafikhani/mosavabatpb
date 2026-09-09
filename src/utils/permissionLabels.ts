@@ -17,6 +17,8 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   MANAGE_USERS: 'مدیریت کاربران',
   CREATE_USER: 'ایجاد کاربر',
   IMPORT_PROPOSALS_FROM_EXCEL: 'ورود پیشنهاد مصوبات از Excel',
+  VIEW_ORGANIZATION_ARCHIVE: 'مشاهده بایگانی سازمانی',
+  MANAGE_ARCHIVE_FOLDERS: 'ایجاد و مدیریت پوشه‌های بایگانی سازمانی',
 };
 
 export const getPermissionLabel = (key: string): string => PERMISSION_LABELS[key as PermissionKey] || key;

@@ -158,6 +158,36 @@
   -webkit-backdrop-filter: none !important;
 }
 
+/* .app-shell/.app-main also carry .bg-white (as the non-glass fallback), so
+   the blanket .bg-white rule above was giving them backdrop-filter too. A
+   `backdrop-filter` on an ancestor creates a new containing block for every
+   `position: fixed` descendant, so every modal in the app (all rendered
+   inline in the page tree, not via a portal) was being sized/positioned
+   against that ancestor's full scrollable content box instead of the real
+   viewport. Keeping backdrop-filter off these two layout containers is what
+   lets `fixed inset-0` modals center in the viewport regardless of scroll. */
+.theme-glass .app-shell,
+.theme-glass .app-main {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Modal panels must read as solid surfaces, not glass — only the backdrop
+   behind a modal should blur, never the modal card itself. */
+.theme-glass .fixed.inset-0 .bg-white {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Every modal overlay in the app shares this utility for its dimmed
+   backdrop; strengthening it once here (instead of in each component) blurs
+   everything behind the modal consistently across the whole app. */
+.backdrop-blur-xs {
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
 /* Blue-glass theme: remap every teal/emerald accent used across the app to
    blue so the whole UI reads as one consistent blue palette with no green. */
 .theme-glass .bg-teal-50 { background-color: var(--color-blue-50) !important; }

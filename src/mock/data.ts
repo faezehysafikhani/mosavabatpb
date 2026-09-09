@@ -85,6 +85,8 @@ export const mockUsers: User[] = [
       'REJECT_RESOLUTION',
       'VIEW_REPORTS',
       'IMPORT_PROPOSALS_FROM_EXCEL',
+      'VIEW_ORGANIZATION_ARCHIVE',
+      'MANAGE_ARCHIVE_FOLDERS',
     ],
   },
   {
@@ -214,6 +216,8 @@ export const mockUsers: User[] = [
       'EDIT_RESOLUTION',
       'VIEW_TASKS',
       'IMPORT_PROPOSALS_FROM_EXCEL',
+      'VIEW_ORGANIZATION_ARCHIVE',
+      'MANAGE_ARCHIVE_FOLDERS',
     ],
   },
   {
@@ -346,6 +350,8 @@ export const mockUsers: User[] = [
       'REJECT_RESOLUTION',
       'VIEW_REPORTS',
       'IMPORT_PROPOSALS_FROM_EXCEL',
+      'VIEW_ORGANIZATION_ARCHIVE',
+      'MANAGE_ARCHIVE_FOLDERS',
     ],
   },
   {
@@ -372,6 +378,8 @@ export const mockUsers: User[] = [
       'EDIT_RESOLUTION',
       'VIEW_TASKS',
       'IMPORT_PROPOSALS_FROM_EXCEL',
+      'VIEW_ORGANIZATION_ARCHIVE',
+      'MANAGE_ARCHIVE_FOLDERS',
     ],
   }
 ];
