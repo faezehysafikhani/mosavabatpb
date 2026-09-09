@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronRight, 
-  ChevronLeft, 
-  Clock, 
-  Plus, 
-  Users, 
-  MapPin, 
+import React, { useEffect, useState } from 'react';
+import {
+  Calendar as CalendarIcon,
+  ChevronRight,
+  ChevronLeft,
+  Clock,
+  Plus,
+  Users,
+  MapPin,
   ChevronDown,
   Sparkles
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { mockMeetings } from '../../mock/data';
+import { meetingService } from '../../services/meetingService';
+import { hasOrgWideMeetingAccess } from '../../services/userScope';
+import { Meeting } from '../../types';
 import { toPersianDigits, getMeetingTypeLabel } from '../../utils/formatters';
 
 const PERSIAN_MONTHS = [
@@ -29,16 +31,39 @@ const PERSIAN_MONTHS = [
   { name: 'اسفند', index: 12, days: 29 },
 ];
 
-const PERSIAN_YEARS = [1401, 1402, 1403, 1404, 1405];
+// Real current Jalali year/month/day (numeric, not Persian-digit strings) —
+// used both as the calendar's initial view and to highlight "today".
+const getTodayJalaliParts = (): { year: number; month: number; day: number } => {
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-persian', {
+    year: 'numeric', month: 'numeric', day: 'numeric',
+  }).formatToParts(new Date());
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { year: get('year'), month: get('month'), day: get('day') };
+};
 
 export const CalendarView: React.FC = () => {
-  const { navigateTo, openCreateMeetingModal, isDarkMode, hasPermission } = useApp();
+  const { navigateTo, openCreateMeetingModal, isDarkMode, hasPermission, currentUser, refreshTrigger } = useApp();
   const canCreateMeeting = hasPermission('CREATE_MEETING');
 
-  const [selectedYear, setSelectedYear] = useState<number>(1403);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(6); // 6 = مهر (index 6, 7th month)
+  const today = getTodayJalaliParts();
+  const PERSIAN_YEARS = [today.year - 2, today.year - 1, today.year, today.year + 1, today.year + 2];
 
-  const currentMonthInfo = PERSIAN_MONTHS[selectedMonthIndex] || PERSIAN_MONTHS[6];
+  const [selectedYear, setSelectedYear] = useState<number>(today.year);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState<number>(today.month - 1);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+
+  useEffect(() => {
+    meetingService
+      .getMeetings({
+        pageSize: 500,
+        participantUserId: hasOrgWideMeetingAccess(currentUser.role) ? undefined : currentUser.id,
+      })
+      .then((res) => {
+        if (res.isSuccess) setMeetings(res.data.items);
+      });
+  }, [currentUser.id, refreshTrigger]);
+
+  const currentMonthInfo = PERSIAN_MONTHS[selectedMonthIndex] || PERSIAN_MONTHS[today.month - 1];
   const daysCount = currentMonthInfo.days;
 
   const handlePrevMonth = () => {
@@ -60,8 +85,8 @@ export const CalendarView: React.FC = () => {
   };
 
   const handleSetToday = () => {
-    setSelectedYear(1403);
-    setSelectedMonthIndex(6); // مهر
+    setSelectedYear(today.year);
+    setSelectedMonthIndex(today.month - 1);
   };
 
   // Convert day number to padded string and full Jalali date
@@ -71,22 +96,12 @@ export const CalendarView: React.FC = () => {
     return `${toPersianDigits(selectedYear.toString())}/${toPersianDigits(monthNum)}/${toPersianDigits(dayNum)}`;
   };
 
-  // Map meetings to days based on current month/year or fallback patterns
+  // Map meetings to days based on the currently viewed month/year.
   const getMeetingsForDay = (day: number) => {
     const monthNumStr = (selectedMonthIndex + 1).toString().padStart(2, '0');
     const dayNumStr = day.toString().padStart(2, '0');
     const targetJalali = `${toPersianDigits(selectedYear.toString())}/${toPersianDigits(monthNumStr)}/${toPersianDigits(dayNumStr)}`;
-    const directMatches = mockMeetings.filter((m) => m.dateJalali === targetJalali);
-    if (directMatches.length > 0) return directMatches;
-
-    // Default sample distributed meetings for active preview
-    if (selectedYear === 1403 && (selectedMonthIndex === 5 || selectedMonthIndex === 6 || selectedMonthIndex === 7)) {
-      if (day === 5) return [mockMeetings[0]];
-      if (day === 12) return [mockMeetings[1]];
-      if (day === 20) return [mockMeetings[2]];
-      if (day === 28) return [mockMeetings[3]];
-    }
-    return [];
+    return meetings.filter((m) => m.dateJalali === targetJalali);
   };
 
   // Handle clicking on a calendar day
@@ -214,7 +229,7 @@ export const CalendarView: React.FC = () => {
           {/* Actual days */}
           {daysArray.map((day) => {
             const dayMeetings = getMeetingsForDay(day);
-            const isToday = selectedYear === 1403 && selectedMonthIndex === 6 && day === 15;
+            const isToday = selectedYear === today.year && selectedMonthIndex === today.month - 1 && day === today.day;
             const isWeekend = (emptyDaysBefore.length + day) % 7 === 0;
 
             return (

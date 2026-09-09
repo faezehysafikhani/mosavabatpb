@@ -60,7 +60,9 @@ export type PermissionKey =
   | 'VIEW_REPORTS'
   | 'MANAGE_USERS'
   | 'CREATE_USER'
-  | 'IMPORT_PROPOSALS_FROM_EXCEL';
+  | 'IMPORT_PROPOSALS_FROM_EXCEL'
+  | 'VIEW_ORGANIZATION_ARCHIVE'
+  | 'MANAGE_ARCHIVE_FOLDERS';
 
 export interface User {
   id: string;
@@ -185,6 +187,33 @@ export interface Proposal {
 }
 
 export type ProposalSource = 'MANUAL' | 'EXCEL_IMPORT';
+
+// A folder-based archive: entirely separate from the CLOSED/بایگانی proposal
+// status in the CEO workflow above — a folder never changes a proposal's
+// status, it only groups references to proposals for easier retrieval.
+export type ArchiveScope = 'PERSONAL' | 'ORGANIZATION';
+
+export interface ArchiveFolder {
+  id: string;
+  name: string;
+  scope: ArchiveScope;
+  // PERSONAL folders belong to one organizational unit; ORGANIZATION
+  // folders are shared org-wide and carry no department owner.
+  ownerDepartmentId?: string;
+  createdByUserId: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface ArchiveItem {
+  id: string;
+  folderId: string;
+  proposalId: string;
+  proposalTitle: string;
+  movedByUserId: string;
+  movedByName: string;
+  movedAt: string;
+}
 
 export type MeetingStatus =
   | 'DRAFT'           // پیش‌نویس

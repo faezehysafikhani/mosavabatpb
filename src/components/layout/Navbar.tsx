@@ -454,8 +454,11 @@ export const Navbar: React.FC = () => {
             <Calendar className="w-3.5 h-3.5 text-[var(--app-primary)]" />
             <span>{todayJalali}</span>
             <span className="w-px h-3 bg-slate-300 dark:bg-slate-600" />
-            <Clock3 className="w-3.5 h-3.5 text-[var(--app-primary)]" />
-            <span dir="ltr">{currentTime}</span>
+            <Clock3 className="w-3.5 h-3.5 text-[var(--app-primary)] shrink-0" />
+            {/* Fixed width (not just tabular-nums) so a second's digit change
+                never nudges the elements to its right — Persian numeral
+                glyphs aren't guaranteed tabular figures in every font. */}
+            <span dir="ltr" className="tabular-nums inline-block text-left" style={{ width: '6.5ch' }}>{currentTime}</span>
           </div>
 
           {/* Logout / Switch User */}

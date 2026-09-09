@@ -9,6 +9,7 @@ import { AUTO_REFRESH_INTERVAL_MS } from '../config/constants';
 export type AppRoute =
   | 'dashboard'
   | 'proposals'
+  | 'archive'
   | 'meetings'
   | 'meeting-details'
   | 'resolutions'
