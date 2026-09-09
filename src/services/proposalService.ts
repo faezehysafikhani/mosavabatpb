@@ -17,6 +17,11 @@ export interface CreateProposalDto {
   presenterName: string;
   description: string;
   rationale?: string;
+  notes?: string;
+  source?: Proposal['source'];
+  sourceLetterNumber?: string;
+  sourceLetterDateJalali?: string;
+  sourceLetterSubject?: string;
 }
 
 const getCurrentTimeString = (): string => toPersianDigits(
@@ -98,16 +103,18 @@ class MockProposalService implements IProposalService {
 
   public async createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
+    const source = dto.source || 'MANUAL';
     const newProposal: Proposal = {
-      id: `prop-${Date.now()}`,
+      id: `prop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       proposalNumber: `پیشنهاد-۱۴۰۳-${toPersianDigits(proposals.length + 1)}`,
       ...dto,
+      source,
       dateJalali: getJalaliDate(),
       attachments: [],
       status: 'PENDING_CEO_REVIEW',
       history: [{
         id: `proposal-history-${Date.now()}`,
-        action: 'ثبت و ارسال پیشنهاد برای مدیرعامل',
+        action: source === 'EXCEL_IMPORT' ? 'پیشنهاد از طریق فایل Excel ثبت و برای مدیرعامل ارسال شد' : 'ثبت و ارسال پیشنهاد برای مدیرعامل',
         actorUserId: dto.proposerUserId || 'unknown',
         actorName: dto.proposerName,
         actorRole: dto.proposerDepartmentName,

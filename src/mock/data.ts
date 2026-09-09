@@ -84,6 +84,7 @@ export const mockUsers: User[] = [
       'APPROVE_RESOLUTION',
       'REJECT_RESOLUTION',
       'VIEW_REPORTS',
+      'IMPORT_PROPOSALS_FROM_EXCEL',
     ],
   },
   {
@@ -212,6 +213,7 @@ export const mockUsers: User[] = [
       'VIEW_RESOLUTIONS',
       'EDIT_RESOLUTION',
       'VIEW_TASKS',
+      'IMPORT_PROPOSALS_FROM_EXCEL',
     ],
   },
   {
@@ -343,6 +345,7 @@ export const mockUsers: User[] = [
       'APPROVE_RESOLUTION',
       'REJECT_RESOLUTION',
       'VIEW_REPORTS',
+      'IMPORT_PROPOSALS_FROM_EXCEL',
     ],
   },
   {
@@ -368,6 +371,7 @@ export const mockUsers: User[] = [
       'VIEW_RESOLUTIONS',
       'EDIT_RESOLUTION',
       'VIEW_TASKS',
+      'IMPORT_PROPOSALS_FROM_EXCEL',
     ],
   }
 ];

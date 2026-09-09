@@ -19,6 +19,7 @@ const PERMISSION_LABELS: Record<PermissionKey, string> = {
   VIEW_REPORTS: 'مشاهده گزارشات',
   MANAGE_USERS: 'مدیریت کاربران',
   CREATE_USER: 'ایجاد کاربر',
+  IMPORT_PROPOSALS_FROM_EXCEL: 'ورود پیشنهاد مصوبات از Excel',
 };
 
 const ALL_PERMISSIONS = Object.keys(PERMISSION_LABELS) as PermissionKey[];

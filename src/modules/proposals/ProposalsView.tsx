@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck
+  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck, FileSpreadsheet, Download
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { proposalService } from '../../services/proposalService';
 import { Proposal, ProposalStatus } from '../../types';
 import { toPersianDigits } from '../../utils/formatters';
 import { CreateProposalModal } from './CreateProposalModal';
+import { ExcelImportModal } from './ExcelImportModal';
+import { downloadProposalExcelTemplate } from '../../services/proposalExcelImportService';
 
 type ProposalTab = 'OFFICE' | 'CEO' | 'MINE';
 type OfficeStatusFilter = 'APPROVED' | 'CONFIRMED_FOR_MEETING' | 'CONVERTED_TO_AGENDA' | 'ALL';
@@ -36,16 +38,18 @@ const OFFICE_FILTERS: { id: OfficeStatusFilter; label: string }[] = [
 ];
 
 export const ProposalsView: React.FC = () => {
-  const { currentUser, availableUsers, showToast, refreshTrigger, triggerRefresh } = useApp();
+  const { currentUser, availableUsers, showToast, refreshTrigger, triggerRefresh, hasPermission } = useApp();
 
   const isOfficeManager = currentUser.role === 'ADMIN' || currentUser.role === 'SECRETARY';
   const isCeo = currentUser.role === 'ADMIN' || currentUser.role === 'CEO';
   const isRegularUser = !isOfficeManager && !isCeo;
+  const canImportFromExcel = hasPermission('IMPORT_PROPOSALS_FROM_EXCEL');
 
   const [tab, setTab] = useState<ProposalTab>(isOfficeManager ? 'OFFICE' : isCeo ? 'CEO' : 'MINE');
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [officeFilter, setOfficeFilter] = useState<OfficeStatusFilter>('APPROVED');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
   const [orderAssignees, setOrderAssignees] = useState<Record<string, string>>({});
   const [orderDeadlines, setOrderDeadlines] = useState<Record<string, string>>({});
@@ -154,6 +158,25 @@ export const ProposalsView: React.FC = () => {
           ثبت پیشنهاد، بررسی مستقیم مدیرعامل و تبدیل موارد تأییدشده به تأیید جلسه توسط مسئول دفتر
         </p>
 
+        {canImportFromExcel && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            <button
+              onClick={downloadProposalExcelTemplate}
+              className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>دانلود نمونه Excel</span>
+            </button>
+            <button
+              onClick={() => setIsExcelImportOpen(true)}
+              className="flex items-center gap-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-bold py-2.5 px-4 rounded-xl cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>ورود از Excel</span>
+            </button>
+          </div>
+        )}
+
         {visibleTabs.length > 1 && (
           <div className="flex flex-wrap gap-2 mt-4">
             {visibleTabs.map(({ id, label, count, icon: Icon }) => (
@@ -214,6 +237,9 @@ export const ProposalsView: React.FC = () => {
                       <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{p.description}</div>
                       <div className="text-[10px] text-slate-500 mt-0.5">پیشنهاددهنده: {p.proposerName} — {p.proposerDepartmentName}</div>
                       {p.assignedMeetingTitle && <div className="text-[10px] text-emerald-700 mt-0.5">جلسه: {p.assignedMeetingTitle}</div>}
+                      {p.source === 'EXCEL_IMPORT' && (
+                        <div className="text-[10px] text-teal-700 mt-0.5">منبع ثبت: ورود از Excel{p.sourceLetterNumber ? ` — نامه ${toPersianDigits(p.sourceLetterNumber)}` : ''}</div>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-slate-600">{p.presenterName || p.confirmedPresenterName || '—'}</td>
                     <td className="py-3 px-3 text-slate-600">
@@ -254,6 +280,11 @@ export const ProposalsView: React.FC = () => {
                 <span>پیشنهاددهنده: {p.proposerName} — {p.proposerDepartmentName}</span>
                 <span>ارائه‌دهنده: {p.presenterName || '—'}</span>
                 <span>تاریخ ثبت: {toPersianDigits(p.dateJalali)}</span>
+                {p.source === 'EXCEL_IMPORT' && (
+                  <span className="text-teal-700 font-bold">
+                    منبع ثبت: ورود از Excel{p.sourceLetterNumber ? ` — نامه ${toPersianDigits(p.sourceLetterNumber)}${p.sourceLetterDateJalali ? ` مورخ ${toPersianDigits(p.sourceLetterDateJalali)}` : ''}` : ''}
+                  </span>
+                )}
               </div>
               <input
                 type="text"
@@ -329,6 +360,7 @@ export const ProposalsView: React.FC = () => {
               <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-500">
                 <span>ارائه‌دهنده: {p.presenterName || '—'}</span>
                 <span>تاریخ ثبت: {toPersianDigits(p.dateJalali)}</span>
+                {p.source === 'EXCEL_IMPORT' && <span className="text-teal-700 font-bold">منبع ثبت: ورود از Excel</span>}
               </div>
               {p.managementDecisionNotes && (
                 <p className="text-[11px] text-slate-500">یادداشت تصمیم: {p.managementDecisionNotes}</p>
@@ -349,6 +381,12 @@ export const ProposalsView: React.FC = () => {
       )}
 
       <CreateProposalModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
+
+      <ExcelImportModal
+        isOpen={isExcelImportOpen}
+        onClose={() => setIsExcelImportOpen(false)}
+        onImported={triggerRefresh}
+      />
 
       {/* Confirm-for-meeting modal: preserve the presenter selected at proposal creation */}
       {confirmingProposal && (
