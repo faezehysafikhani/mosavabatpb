@@ -82,7 +82,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="app-shell min-h-screen bg-white dark:bg-slate-950 flex flex-col text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-[var(--app-primary)] selection:text-white" dir="rtl">
+    <div className="app-shell h-screen overflow-hidden bg-white dark:bg-slate-950 flex flex-col text-slate-800 dark:text-slate-100 font-sans antialiased selection:bg-[var(--app-primary)] selection:text-white" dir="rtl">
       {/* Top Navbar */}
       <Navbar />
 
