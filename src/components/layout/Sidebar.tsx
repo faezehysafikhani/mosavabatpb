@@ -13,7 +13,8 @@ import {
   UserCheck,
   Settings,
   Lightbulb,
-  Archive
+  Archive,
+  PieChart
 } from 'lucide-react';
 import { useApp, AppRoute } from '../../context/AppContext';
 import { toPersianDigits } from '../../utils/formatters';
@@ -147,6 +148,11 @@ export const Sidebar: React.FC = () => {
           route: 'reports' as AppRoute,
           title: 'گزارش عملکرد',
           icon: FileSpreadsheet,
+        },
+        {
+          route: 'infographics' as AppRoute,
+          title: 'اینفوگراف',
+          icon: PieChart,
         },
         ...(currentUser.role === 'ADMIN' || hasPermission('MANAGE_USERS')
           ? [
