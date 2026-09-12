@@ -10,6 +10,10 @@ interface CreateProposalModalProps {
 
 export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen, onClose }) => {
   const { currentUser, availableUsers, showToast, triggerRefresh } = useApp();
+  // Office manager / CEO / Admin submit proposals on behalf of others, so
+  // they pick the presenter; anyone else submitting their own proposal IS
+  // the presenter — fixed to themselves, not a free choice.
+  const canChoosePresenter = ['ADMIN', 'CEO', 'SECRETARY'].includes(currentUser.role);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [rationale, setRationale] = useState('');
@@ -20,7 +24,7 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const presenter = availableUsers.find((user) => user.id === presenterUserId);
+    const presenter = canChoosePresenter ? availableUsers.find((user) => user.id === presenterUserId) : currentUser;
     if (!title.trim() || !description.trim() || !presenter) {
       showToast('خطا', 'عنوان، توضیحات و ارائه‌دهنده الزامی است.', 'error');
       return;
@@ -77,10 +81,16 @@ export const CreateProposalModal: React.FC<CreateProposalModalProps> = ({ isOpen
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">ارائه‌دهنده *</label>
-            <select value={presenterUserId} onChange={(e) => setPresenterUserId(e.target.value)} required className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
-              <option value="">انتخاب ارائه‌دهنده...</option>
-              {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} ({user.title})</option>)}
-            </select>
+            {canChoosePresenter ? (
+              <select value={presenterUserId} onChange={(e) => setPresenterUserId(e.target.value)} required className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                <option value="">انتخاب ارائه‌دهنده...</option>
+                {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} ({user.title})</option>)}
+              </select>
+            ) : (
+              <div className="w-full text-xs p-2.5 bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700">
+                {currentUser.fullName} ({currentUser.title})
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">عنوان *</label>

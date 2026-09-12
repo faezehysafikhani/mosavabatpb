@@ -21,7 +21,6 @@ import {
   FileCheck2,
   ExternalLink,
   FileDown,
-  Send,
   ArrowUp,
   ArrowDown,
   RotateCcw,
@@ -112,7 +111,15 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
   const handleAgendaReview = async (decision: 'APPROVE' | 'RETURN') => {
     try {
       await meetingService.reviewAgenda(meetingId, decision, agendaReviewNotes, currentUser);
-      showToast('بررسی دستورکار', decision === 'APPROVE' ? 'دستورکار تأیید و آماده ارسال دعوتنامه شد.' : 'دستورکار برای اصلاح به دبیرخانه بازگشت.', 'success');
+      if (decision === 'APPROVE') {
+        // Invitations are no longer a separate manual step — they go out
+        // automatically the moment the agenda is approved, right where the
+        // meeting becomes READY_FOR_INVITATION.
+        await meetingService.sendInvitations(meetingId, currentUser);
+        showToast('بررسی دستورکار', 'دستورکار تأیید شد و دعوتنامه به‌صورت خودکار برای اعضا و مدعوین ارسال شد.', 'success');
+      } else {
+        showToast('بررسی دستورکار', 'دستورکار برای اصلاح به دبیرخانه بازگشت.', 'success');
+      }
       triggerRefresh();
     } catch (error) { showToast('خطا', error instanceof Error ? error.message : 'عملیات انجام نشد.', 'error'); }
   };
@@ -155,11 +162,6 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
     if (!window.confirm('آیا از پایان این جلسه اطمینان دارید؟')) return;
     try { await meetingService.endMeeting(meetingId, currentUser); showToast('پایان جلسه', 'جلسه با موفقیت خاتمه یافت. مصوبات آن به‌طور مستقل به روند اجرای خود ادامه می‌دهند.', 'success'); triggerRefresh(); }
     catch (error) { showToast('خطا', error instanceof Error ? error.message : 'خاتمه جلسه انجام نشد.', 'error'); }
-  };
-
-  const handleSendInvitations = async () => {
-    try { await meetingService.sendInvitations(meetingId, currentUser); showToast('ارسال دعوتنامه', 'دعوتنامه اعضا و مدعوین ارسال و در تاریخچه ثبت شد.', 'success'); triggerRefresh(); }
-    catch (error) { showToast('خطا', error instanceof Error ? error.message : 'ارسال انجام نشد.', 'error'); }
   };
 
   const handleInvitationViewed = async () => {
@@ -211,7 +213,6 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
 
         <div className="flex flex-wrap items-center gap-2">
           {isSecretariat && meeting.status === 'AGENDA_RETURNED' && <button onClick={async () => { await meetingService.submitAgenda(meeting.id, currentUser); triggerRefresh(); }} className="flex items-center gap-1.5 bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded-xl"><RotateCcw className="w-4 h-4" />ارسال مجدد دستورکار</button>}
-          {isSecretariat && meeting.status === 'READY_FOR_INVITATION' && <button onClick={handleSendInvitations} className="flex items-center gap-1.5 bg-violet-700 text-white font-bold text-xs py-2 px-4 rounded-xl"><Send className="w-4 h-4" />ارسال دعوتنامه‌ها</button>}
           {(isCeo || isSecretariat) && meeting.status === 'IN_PROGRESS' && (
             <button
               onClick={handleEndMeeting}
@@ -604,8 +605,7 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
       {activeTab === 'INVITATIONS' && (
         <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200/90 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div><h3 className="text-xs font-extrabold text-slate-800">دعوتنامه اعضا و مدعوین مستقل</h3><p className="text-[11px] text-slate-500 mt-1">ارسال دعوتنامه فقط پس از تأیید نهایی دستورکار فعال می‌شود.</p></div>
-            {isSecretariat && meeting.status === 'READY_FOR_INVITATION' && <button onClick={handleSendInvitations} className="bg-violet-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5"><Send className="w-4 h-4" />ارسال همه دعوتنامه‌ها</button>}
+            <div><h3 className="text-xs font-extrabold text-slate-800">دعوتنامه اعضا و مدعوین مستقل</h3><p className="text-[11px] text-slate-500 mt-1">دعوتنامه به‌صورت خودکار بلافاصله پس از تأیید نهایی دستورکار برای همه اعضا و مدعوین ارسال می‌شود.</p></div>
           </div>
 
           {isSecretariat && !['INVITATION_SENT', 'IN_PROGRESS', 'HELD'].includes(meeting.status) && (

@@ -87,6 +87,7 @@ export const mockUsers: User[] = [
       'IMPORT_PROPOSALS_FROM_EXCEL',
       'VIEW_ORGANIZATION_ARCHIVE',
       'MANAGE_ARCHIVE_FOLDERS',
+      'SIGN_RESOLUTION',
     ],
   },
   {
@@ -218,6 +219,7 @@ export const mockUsers: User[] = [
       'IMPORT_PROPOSALS_FROM_EXCEL',
       'VIEW_ORGANIZATION_ARCHIVE',
       'MANAGE_ARCHIVE_FOLDERS',
+      'SIGN_RESOLUTION',
     ],
   },
   {
@@ -352,6 +354,7 @@ export const mockUsers: User[] = [
       'IMPORT_PROPOSALS_FROM_EXCEL',
       'VIEW_ORGANIZATION_ARCHIVE',
       'MANAGE_ARCHIVE_FOLDERS',
+      'SIGN_RESOLUTION',
     ],
   },
   {
@@ -380,6 +383,7 @@ export const mockUsers: User[] = [
       'IMPORT_PROPOSALS_FROM_EXCEL',
       'VIEW_ORGANIZATION_ARCHIVE',
       'MANAGE_ARCHIVE_FOLDERS',
+      'SIGN_RESOLUTION',
     ],
   }
 ];

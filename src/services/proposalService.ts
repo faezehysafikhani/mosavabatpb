@@ -57,8 +57,8 @@ export interface IProposalService {
   recoverProposal(id: string, actor: User): Promise<ApiResponse<Proposal>>;
   returnForRevision(id: string, reason: string, actor: User): Promise<ApiResponse<Proposal>>;
   resubmitProposal(id: string, updates: ResubmitProposalUpdates, actor: User): Promise<ApiResponse<Proposal>>;
-  decideWithoutBoard(id: string, decision: 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED' | 'CLOSED', notes: string, actor: User, order?: Proposal['ceoOrder']): Promise<ApiResponse<Proposal>>;
-  updateCeoOrderStatus(id: string, status: 'IN_PROGRESS' | 'COMPLETED', actor: User): Promise<ApiResponse<Proposal>>;
+  decideWithoutBoard(id: string, decision: 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED', notes: string, actor: User, order?: Proposal['ceoOrder']): Promise<ApiResponse<Proposal>>;
+  updateCeoOrderStatus(id: string, status: 'IN_PROGRESS' | 'COMPLETED', actor: User, completionNotes?: string): Promise<ApiResponse<Proposal>>;
   confirmForMeeting(id: string): Promise<ApiResponse<Proposal>>;
   markConvertedToAgenda(id: string, meetingId: string, meetingTitle: string, relatedUsers?: Proposal['relatedUsers']): Promise<ApiResponse<Proposal>>;
 }
@@ -224,7 +224,7 @@ class MockProposalService implements IProposalService {
     return apiClient.simulateNetwork(proposal, 120);
   }
 
-  public async decideWithoutBoard(id: string, decision: 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED' | 'CLOSED', notes: string, actor: User, order?: Proposal['ceoOrder']): Promise<ApiResponse<Proposal>> {
+  public async decideWithoutBoard(id: string, decision: 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED', notes: string, actor: User, order?: Proposal['ceoOrder']): Promise<ApiResponse<Proposal>> {
     if (!['CEO', 'ADMIN'].includes(actor.role)) throw new Error('فقط مدیرعامل مجاز به ثبت این تصمیم است');
     if (!notes.trim()) throw new Error('ثبت توضیحات تصمیم مدیرعامل الزامی است');
     const proposals = this.getData();
@@ -236,20 +236,22 @@ class MockProposalService implements IProposalService {
     proposal.status = decision;
     proposal.managementDecisionNotes = notes.trim();
     proposal.ceoOrder = decision === 'CEO_ORDER_ISSUED' ? order : undefined;
-    const labels = { NO_BOARD_REQUIRED: 'عدم نیاز به طرح در هیأت‌مدیره', CEO_ORDER_ISSUED: 'صدور دستور مستقیم مدیرعامل', CLOSED: 'مختومه به دلایل دیگر' };
+    const labels = { NO_BOARD_REQUIRED: 'عدم نیاز به طرح در هیأت‌مدیره', CEO_ORDER_ISSUED: 'صدور دستور مستقیم مدیرعامل' };
     this.addHistory(proposal, actor, labels[decision], previousStatus, notes.trim());
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 120);
   }
 
-  public async updateCeoOrderStatus(id: string, status: 'IN_PROGRESS' | 'COMPLETED', actor: User): Promise<ApiResponse<Proposal>> {
+  public async updateCeoOrderStatus(id: string, status: 'IN_PROGRESS' | 'COMPLETED', actor: User, completionNotes?: string): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((item) => item.id === id);
     if (!proposal?.ceoOrder) throw new Error('دستور مدیرعامل یافت نشد');
     if (proposal.ceoOrder.assigneeUserId !== actor.id && actor.role !== 'ADMIN') throw new Error('فقط مسئول تعیین‌شده می‌تواند وضعیت دستور را تغییر دهد');
+    if (status === 'COMPLETED' && !completionNotes?.trim()) throw new Error('توضیح اقدام انجام‌شده الزامی است');
     const previousStatus = proposal.ceoOrder.status;
     proposal.ceoOrder.status = status;
-    this.addHistory(proposal, actor, status === 'COMPLETED' ? 'اعلام انجام دستور مدیرعامل' : 'آغاز اجرای دستور مدیرعامل', previousStatus);
+    if (status === 'COMPLETED') proposal.ceoOrder.completionNotes = completionNotes!.trim();
+    this.addHistory(proposal, actor, status === 'COMPLETED' ? 'اعلام انجام دستور مدیرعامل' : 'آغاز اجرای دستور مدیرعامل', previousStatus, status === 'COMPLETED' ? completionNotes!.trim() : undefined);
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 120);
   }

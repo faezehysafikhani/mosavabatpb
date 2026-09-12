@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserPlus, Pencil, ShieldCheck, Trash2, Search } from 'lucide-react';
+import { UserPlus, Pencil, ShieldCheck, UserX, UserCheck, Search } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { User, UserRole } from '../../types';
 import { CreateUserModal } from '../users/CreateUserModal';
@@ -15,12 +15,17 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const UsersTable: React.FC = () => {
-  const { availableUsers, hasPermission, currentUser, deleteUser } = useApp();
+  const { availableUsers, hasPermission, currentUser, deleteUser, updateUser } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [permissionsUser, setPermissionsUser] = useState<User | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeactivateId, setConfirmDeactivateId] = useState<string | null>(null);
+
+  const handleActivate = async (user: User) => {
+    const { id, ...rest } = user;
+    await updateUser(id, { ...rest, isActive: true, archivedAt: undefined });
+  };
 
   const canManage = hasPermission('MANAGE_USERS') || currentUser.role === 'ADMIN';
 
@@ -80,9 +85,15 @@ export const UsersTable: React.FC = () => {
                     <button onClick={() => setPermissionsUser(user)} title="دسترسی" className="p-1.5 rounded-lg text-blue-700 hover:bg-blue-50 cursor-pointer">
                       <ShieldCheck className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setConfirmDeleteId(user.id)} title="حذف" className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {user.isActive ? (
+                      <button onClick={() => setConfirmDeactivateId(user.id)} title="غیرفعال‌سازی" className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer">
+                        <UserX className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button onClick={() => handleActivate(user)} title="فعال‌سازی" className="p-1.5 rounded-lg text-emerald-700 hover:bg-emerald-50 cursor-pointer">
+                        <UserCheck className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -95,18 +106,18 @@ export const UsersTable: React.FC = () => {
       <CreateUserModal isOpen={Boolean(editingUser)} user={editingUser} onClose={() => setEditingUser(null)} />
       <PermissionsModal user={permissionsUser} onClose={() => setPermissionsUser(null)} />
 
-      {confirmDeleteId && (
+      {confirmDeactivateId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-5 space-y-4">
-            <h3 className="text-sm font-bold text-slate-800">حذف کاربر</h3>
-            <p className="text-xs text-slate-600">آیا از حذف این کاربر مطمئن هستید؟ این عملیات قابل بازگشت نیست.</p>
+            <h3 className="text-sm font-bold text-slate-800">غیرفعال‌سازی کاربر</h3>
+            <p className="text-xs text-slate-600">این کاربر غیرفعال می‌شود و دیگر امکان ورود به سامانه را نخواهد داشت؛ سوابق جلسات و مصوبات مرتبط با او حفظ می‌ماند و در هر زمان می‌توانید دوباره فعالش کنید.</p>
             <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer">انصراف</button>
+              <button onClick={() => setConfirmDeactivateId(null)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer">انصراف</button>
               <button
-                onClick={async () => { await deleteUser(confirmDeleteId); setConfirmDeleteId(null); }}
+                onClick={async () => { await deleteUser(confirmDeactivateId); setConfirmDeactivateId(null); }}
                 className="px-5 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-xs cursor-pointer"
               >
-                حذف قطعی
+                غیرفعال کن
               </button>
             </div>
           </div>

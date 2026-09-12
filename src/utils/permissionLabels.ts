@@ -19,6 +19,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   IMPORT_PROPOSALS_FROM_EXCEL: 'ورود پیشنهاد مصوبات از Excel',
   VIEW_ORGANIZATION_ARCHIVE: 'مشاهده بایگانی سازمانی',
   MANAGE_ARCHIVE_FOLDERS: 'ایجاد و مدیریت پوشه‌های بایگانی سازمانی',
+  SIGN_RESOLUTION: 'امضای دیجیتال مصوبات',
 };
 
 export const getPermissionLabel = (key: string): string => PERMISSION_LABELS[key as PermissionKey] || key;

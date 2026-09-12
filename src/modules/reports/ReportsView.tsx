@@ -42,7 +42,6 @@ const PROPOSAL_STATUS_CHART_META: Partial<Record<ProposalStatus, { label: string
   RETURNED_FOR_REVISION: { label: 'برگشت جهت اصلاح', color: '#fb923c' },
   NO_BOARD_REQUIRED: { label: 'عدم نیاز به طرح', color: '#94a3b8' },
   CEO_ORDER_ISSUED: { label: 'دستور مستقیم مدیرعامل', color: '#a855f7' },
-  CLOSED: { label: 'مختومه به دلایل دیگر', color: '#64748b' },
   CONFIRMED_FOR_MEETING: { label: 'تایید جلسه شده', color: '#8b5cf6' },
   CONVERTED_TO_AGENDA: { label: 'تبدیل شده به دستور جلسه', color: '#10b981' },
 };
