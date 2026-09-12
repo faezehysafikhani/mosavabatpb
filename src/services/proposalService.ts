@@ -236,7 +236,7 @@ class MockProposalService implements IProposalService {
     proposal.status = decision;
     proposal.managementDecisionNotes = notes.trim();
     proposal.ceoOrder = decision === 'CEO_ORDER_ISSUED' ? order : undefined;
-    const labels = { NO_BOARD_REQUIRED: 'عدم نیاز به طرح در هیأت‌مدیره', CEO_ORDER_ISSUED: 'صدور دستور مستقیم مدیرعامل', CLOSED: 'مختومه و بایگانی پیشنهاد' };
+    const labels = { NO_BOARD_REQUIRED: 'عدم نیاز به طرح در هیأت‌مدیره', CEO_ORDER_ISSUED: 'صدور دستور مستقیم مدیرعامل', CLOSED: 'مختومه به دلایل دیگر' };
     this.addHistory(proposal, actor, labels[decision], previousStatus, notes.trim());
     this.saveData(proposals);
     return apiClient.simulateNetwork(proposal, 120);

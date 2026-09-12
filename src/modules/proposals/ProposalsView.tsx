@@ -22,7 +22,7 @@ const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
   RESUBMITTED: { label: 'اصلاح و ارسال مجدد', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
   NO_BOARD_REQUIRED: { label: 'عدم نیاز به طرح در هیأت‌مدیره', bg: 'bg-slate-50 text-slate-700 border-slate-200' },
   CEO_ORDER_ISSUED: { label: 'دستور مدیرعامل صادر شد', bg: 'bg-purple-50 text-purple-700 border-purple-200' },
-  CLOSED: { label: 'مختومه / بایگانی', bg: 'bg-slate-100 text-slate-600 border-slate-300' },
+  CLOSED: { label: 'مختومه به دلایل دیگر', bg: 'bg-slate-100 text-slate-600 border-slate-300' },
   APPROVED: { label: 'تایید جلسات تایید نشده', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
   CONFIRMED_FOR_MEETING: { label: 'تایید جلسه شده', bg: 'bg-violet-50 text-violet-700 border-violet-200' },
   CONVERTED_TO_AGENDA: { label: 'تبدیل شده به بند دستور جلسه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -414,7 +414,7 @@ export const ProposalsView: React.FC = () => {
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" />صدور دستور
                 </button>
-                <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer"><Archive className="w-3.5 h-3.5" />بایگانی</button>
+                <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer"><Archive className="w-3.5 h-3.5" />مختومه به دلایل دیگر</button>
               </div>
 
               {/* Assignee/deadline apply only to "صدور دستور" (a direct CEO
