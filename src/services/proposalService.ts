@@ -32,6 +32,23 @@ const getJalaliDate = (date: Date = new Date()): string => new Intl.DateTimeForm
   year: 'numeric', month: '2-digit', day: '2-digit',
 }).format(date).replace(/[\u200e\u200f]/g, '');
 
+export interface ResubmitProposalUpdates {
+  title: string;
+  description: string;
+  rationale?: string;
+  // Only supplied when resubmitting a RETURNED_FOR_REVISION proposal whose
+  // source is EXCEL_IMPORT — the office manager must re-upload a corrected
+  // Excel row rather than editing fields inline, and that row may also
+  // correct the presenter/department/letter details below.
+  presenterUserId?: string;
+  presenterName?: string;
+  proposerDepartmentId?: string;
+  proposerDepartmentName?: string;
+  sourceLetterNumber?: string;
+  sourceLetterDateJalali?: string;
+  sourceLetterSubject?: string;
+}
+
 export interface IProposalService {
   getProposals(params?: ApiFilterParams): Promise<ApiResponse<PagedResult<Proposal>>>;
   createProposal(dto: CreateProposalDto): Promise<ApiResponse<Proposal>>;
@@ -39,7 +56,7 @@ export interface IProposalService {
   forwardToCeo(id: string): Promise<ApiResponse<Proposal>>;
   recoverProposal(id: string, actor: User): Promise<ApiResponse<Proposal>>;
   returnForRevision(id: string, reason: string, actor: User): Promise<ApiResponse<Proposal>>;
-  resubmitProposal(id: string, updates: { title: string; description: string; rationale?: string }, actor: User): Promise<ApiResponse<Proposal>>;
+  resubmitProposal(id: string, updates: ResubmitProposalUpdates, actor: User): Promise<ApiResponse<Proposal>>;
   decideWithoutBoard(id: string, decision: 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED' | 'CLOSED', notes: string, actor: User, order?: Proposal['ceoOrder']): Promise<ApiResponse<Proposal>>;
   updateCeoOrderStatus(id: string, status: 'IN_PROGRESS' | 'COMPLETED', actor: User): Promise<ApiResponse<Proposal>>;
   confirmForMeeting(id: string): Promise<ApiResponse<Proposal>>;
@@ -187,7 +204,7 @@ class MockProposalService implements IProposalService {
     return apiClient.simulateNetwork(proposal, 120);
   }
 
-  public async resubmitProposal(id: string, updates: { title: string; description: string; rationale?: string }, actor: User): Promise<ApiResponse<Proposal>> {
+  public async resubmitProposal(id: string, updates: ResubmitProposalUpdates, actor: User): Promise<ApiResponse<Proposal>> {
     const proposals = this.getData();
     const proposal = proposals.find((item) => item.id === id);
     if (!proposal) throw new Error('پیشنهاد یافت نشد');
@@ -196,6 +213,11 @@ class MockProposalService implements IProposalService {
     proposal.title = updates.title.trim();
     proposal.description = updates.description.trim();
     proposal.rationale = updates.rationale?.trim();
+    if (updates.presenterUserId) { proposal.presenterUserId = updates.presenterUserId; proposal.presenterName = updates.presenterName; }
+    if (updates.proposerDepartmentId) { proposal.proposerDepartmentId = updates.proposerDepartmentId; proposal.proposerDepartmentName = updates.proposerDepartmentName; }
+    if (updates.sourceLetterNumber) proposal.sourceLetterNumber = updates.sourceLetterNumber;
+    if (updates.sourceLetterDateJalali) proposal.sourceLetterDateJalali = updates.sourceLetterDateJalali;
+    if (updates.sourceLetterSubject !== undefined) proposal.sourceLetterSubject = updates.sourceLetterSubject;
     proposal.status = 'RESUBMITTED';
     this.addHistory(proposal, actor, 'اصلاح و ارسال مجدد پیشنهاد', 'RETURNED_FOR_REVISION');
     this.saveData(proposals);
