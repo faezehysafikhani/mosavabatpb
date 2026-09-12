@@ -5,6 +5,7 @@ import {
   Printer,
   TrendingUp,
   Building2,
+  PieChart,
   X
 } from 'lucide-react';
 import {
@@ -17,12 +18,36 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
-import { reportService, SemiAnnualReport } from '../../services/reportService';
+import { Chart as ChartJS, ArcElement, Tooltip as ChartJsTooltip, Legend as ChartJsLegend } from 'chart.js';
+import { Doughnut } from 'react-chartjs-2';
+import { reportService, SemiAnnualReport, ResolutionStatusDistribution } from '../../services/reportService';
 import { resolutionService } from '../../services/resolutionService';
+import { proposalService } from '../../services/proposalService';
 import { mockDepartments } from '../../mock/data';
-import { DepartmentPerformance, DashboardKPIs, Resolution } from '../../types';
+import { DepartmentPerformance, DashboardKPIs, Resolution, ProposalStatus } from '../../types';
 import { toPersianDigits, getResolutionExecutionMeta } from '../../utils/formatters';
 import { useApp } from '../../context/AppContext';
+
+ChartJS.register(ArcElement, ChartJsTooltip, ChartJsLegend);
+
+// Kept local and separate from ProposalsView's own STATUS_META so this
+// purely-additive reporting screen never depends on (or risks perturbing)
+// the proposal workflow module.
+const PROPOSAL_STATUS_CHART_META: Partial<Record<ProposalStatus, { label: string; color: string }>> = {
+  PENDING_OFFICE_REVIEW: { label: 'در انتظار بررسی مسئول دفتر', color: '#0ea5e9' },
+  PENDING_CEO_REVIEW: { label: 'در انتظار بررسی مدیرعامل', color: '#f59e0b' },
+  RESUBMITTED: { label: 'اصلاح و ارسال مجدد', color: '#f59e0b' },
+  APPROVED: { label: 'تایید شده', color: '#3b82f6' },
+  REJECTED: { label: 'رد شده', color: '#ef4444' },
+  RETURNED_FOR_REVISION: { label: 'برگشت جهت اصلاح', color: '#fb923c' },
+  NO_BOARD_REQUIRED: { label: 'عدم نیاز به طرح', color: '#94a3b8' },
+  CEO_ORDER_ISSUED: { label: 'دستور مستقیم مدیرعامل', color: '#a855f7' },
+  CLOSED: { label: 'مختومه به دلایل دیگر', color: '#64748b' },
+  CONFIRMED_FOR_MEETING: { label: 'تایید جلسه شده', color: '#8b5cf6' },
+  CONVERTED_TO_AGENDA: { label: 'تبدیل شده به دستور جلسه', color: '#10b981' },
+};
+
+interface ProposalStatusCount { status: ProposalStatus; label: string; color: string; count: number }
 
 export const ReportsView: React.FC = () => {
   const { showToast, navigateTo } = useApp();
@@ -36,6 +61,8 @@ export const ReportsView: React.FC = () => {
   const [fromDate, setFromDate] = useState('۱۴۰۳/۰۱/۰۱');
   const [toDate, setToDate] = useState('۱۴۰۵/۱۲/۲۹');
   const [semiAnnual, setSemiAnnual] = useState<SemiAnnualReport | null>(null);
+  const [resolutionStatusDist, setResolutionStatusDist] = useState<ResolutionStatusDistribution[]>([]);
+  const [proposalStatusCounts, setProposalStatusCounts] = useState<ProposalStatusCount[]>([]);
 
   useEffect(() => {
     loadReports();
@@ -44,17 +71,34 @@ export const ReportsView: React.FC = () => {
   const loadReports = async () => {
     setLoading(true);
     try {
-      const [deptRes, kpiRes, trendRes, semiRes] = await Promise.all([
+      const [deptRes, kpiRes, trendRes, semiRes, resolutionDistRes, proposalsRes] = await Promise.all([
         reportService.getDepartmentPerformances(),
         reportService.getDashboardKPIs(),
         reportService.getMonthlyTrends(),
         reportService.getSemiAnnualReport(fromDate, toDate),
+        reportService.getResolutionStatusDistribution(),
+        proposalService.getProposals({ pageSize: 1000 }),
       ]);
 
       if (deptRes.isSuccess) setDepartments(deptRes.data);
       if (kpiRes.isSuccess) setKpis(kpiRes.data);
       if (trendRes.isSuccess) setMonthlyTrends(trendRes.data);
       if (semiRes.isSuccess) setSemiAnnual(semiRes.data);
+      if (resolutionDistRes.isSuccess) setResolutionStatusDist(resolutionDistRes.data.filter((item) => item.count > 0));
+
+      if (proposalsRes.isSuccess) {
+        const counts = new Map<ProposalStatus, number>();
+        proposalsRes.data.items.forEach((p) => counts.set(p.status, (counts.get(p.status) || 0) + 1));
+        const rows: ProposalStatusCount[] = Array.from(counts.entries())
+          .map(([status, count]) => ({
+            status,
+            count,
+            label: PROPOSAL_STATUS_CHART_META[status]?.label || status,
+            color: PROPOSAL_STATUS_CHART_META[status]?.color || '#cbd5e1',
+          }))
+          .sort((a, b) => b.count - a.count);
+        setProposalStatusCounts(rows);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -117,6 +161,80 @@ export const ReportsView: React.FC = () => {
       <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-100 space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-3"><div><h3 className="text-sm font-extrabold text-slate-900">گزارش شش‌ماهه نتایج مصوبات</h3><p className="text-[11px] text-slate-500">بازه شمسی دلخواه را برای دوره شش‌ماهه انتخاب کنید.</p></div><div className="flex flex-wrap items-end gap-2"><label className="text-[10px] text-slate-500">از تاریخ<input value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="block mt-1 text-xs p-2 border rounded-lg" /></label><label className="text-[10px] text-slate-500">تا تاریخ<input value={toDate} onChange={(e) => setToDate(e.target.value)} className="block mt-1 text-xs p-2 border rounded-lg" /></label><button onClick={loadReports} className="bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold">محاسبه گزارش</button></div></div>
         {semiAnnual && <><div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">{[{ label: 'کل مصوبات', value: semiAnnual.total }, { label: 'اجراشده', value: semiAnnual.completed }, { label: 'در حال اجرا', value: semiAnnual.inProgress }, { label: 'اجرا نشده', value: semiAnnual.notStarted }, { label: 'دارای تأخیر', value: semiAnnual.overdue }, { label: 'درصد تحقق', value: `${semiAnnual.fulfillmentPercent}٪` }].map((item) => <div key={item.label} className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-center"><div className="text-[10px] text-slate-500">{item.label}</div><strong className="block text-lg text-slate-900 mt-1">{toPersianDigits(item.value)}</strong></div>)}</div><div className="grid grid-cols-1 lg:grid-cols-3 gap-4"><div><h4 className="text-xs font-bold mb-2">تفکیک بر اساس واحد</h4>{semiAnnual.byDepartment.map((item) => <div key={item.name} className="flex justify-between p-2 border-b text-xs"><span>{item.name}</span><span>{toPersianDigits(item.completed)} از {toPersianDigits(item.count)}</span></div>)}</div><div><h4 className="text-xs font-bold mb-2">تفکیک بر اساس جلسه</h4>{semiAnnual.byMeeting.map((item) => <div key={item.id} className="flex justify-between p-2 border-b text-xs"><span>{item.name}</span><span>{toPersianDigits(item.count)} مصوبه</span></div>)}</div><div><h4 className="text-xs font-bold mb-2">مصوبات مهم و معوق</h4>{semiAnnual.importantOrOverdue.length === 0 ? <div className="text-xs text-slate-400">موردی در این بازه نیست.</div> : semiAnnual.importantOrOverdue.map((item) => <button key={item.id} onClick={() => navigateTo('resolutions', { resolutionId: item.id })} className="w-full text-right p-2 border-b text-xs hover:bg-slate-50"><strong>{item.resolutionNumber}</strong> — {item.topicTitle}</button>)}</div></div></>}
+      </div>
+
+      {/* Infographic: proposal & resolution status breakdown (doughnut charts, Chart.js) */}
+      <div className="bg-white rounded-2xl p-6 shadow-xs border border-slate-100 space-y-5">
+        <h3 className="text-xs font-bold text-slate-800 flex items-center gap-2 border-b border-slate-100 pb-3">
+          <PieChart className="w-4 h-4 text-blue-600" />
+          <span>نمای کلی وضعیت مصوبات پیشنهادی و اجرای مصوبات</span>
+        </h3>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-[11px] font-bold text-slate-600 mb-3 text-center">توزیع وضعیت مصوبات پیشنهادی</h4>
+            {proposalStatusCounts.length === 0 ? (
+              <div className="text-center text-xs text-slate-400 py-10">داده‌ای برای نمایش وجود ندارد.</div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-full max-w-[220px] h-[220px]">
+                  <Doughnut
+                    data={{
+                      labels: proposalStatusCounts.map((s) => s.label),
+                      datasets: [{
+                        data: proposalStatusCounts.map((s) => s.count),
+                        backgroundColor: proposalStatusCounts.map((s) => s.color),
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                      }],
+                    }}
+                    options={{ plugins: { legend: { display: false } }, cutout: '65%', maintainAspectRatio: false }}
+                  />
+                </div>
+                <div className="w-full space-y-1.5">
+                  {proposalStatusCounts.map((s) => (
+                    <div key={s.status} className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }}></span>{s.label}</span>
+                      <span className="font-bold text-slate-700">{toPersianDigits(s.count)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h4 className="text-[11px] font-bold text-slate-600 mb-3 text-center">توزیع وضعیت اجرای مصوبات مصوب‌شده</h4>
+            {resolutionStatusDist.length === 0 ? (
+              <div className="text-center text-xs text-slate-400 py-10">داده‌ای برای نمایش وجود ندارد.</div>
+            ) : (
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-full max-w-[220px] h-[220px]">
+                  <Doughnut
+                    data={{
+                      labels: resolutionStatusDist.map((s) => s.statusLabel),
+                      datasets: [{
+                        data: resolutionStatusDist.map((s) => s.count),
+                        backgroundColor: resolutionStatusDist.map((s) => s.color),
+                        borderWidth: 2,
+                        borderColor: '#ffffff',
+                      }],
+                    }}
+                    options={{ plugins: { legend: { display: false } }, cutout: '65%', maintainAspectRatio: false }}
+                  />
+                </div>
+                <div className="w-full space-y-1.5">
+                  {resolutionStatusDist.map((s) => (
+                    <div key={s.statusKey} className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }}></span>{s.statusLabel}</span>
+                      <span className="font-bold text-slate-700">{toPersianDigits(s.count)} ({toPersianDigits(s.percentage)}٪)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Monthly Trend Line Chart */}
