@@ -217,6 +217,13 @@ export const ProposalsView: React.FC = () => {
   };
 
   const ceoQueue = proposals.filter((p) => ['PENDING_CEO_REVIEW', 'RESUBMITTED'].includes(p.status));
+  // CEO_ORDER_ISSUED proposals leave ceoQueue for good once decided, so this
+  // is the only place the CEO can see whether the assignee has since acted
+  // on the order (ceoOrder.status), not just that the order was issued.
+  const issuedOrders = proposals.filter((p) => p.status === 'CEO_ORDER_ISSUED' && p.ceoOrder);
+  const CEO_ORDER_STATUS_LABEL: Record<'PENDING' | 'IN_PROGRESS' | 'COMPLETED', string> = {
+    PENDING: 'در انتظار اقدام', IN_PROGRESS: 'در حال اقدام', COMPLETED: 'انجام‌شده',
+  };
   const officeEligibleStatuses: ProposalStatus[] = ['APPROVED', 'CONFIRMED_FOR_MEETING', 'CONVERTED_TO_AGENDA', 'RETURNED_FOR_REVISION', 'RESUBMITTED', 'NO_BOARD_REQUIRED', 'CEO_ORDER_ISSUED', 'CLOSED', 'REJECTED'];
   const officeItems = proposals.filter((p) => officeEligibleStatuses.includes(p.status) && (officeFilter === 'ALL' || p.status === officeFilter));
   const myProposals = proposals.filter((p) => p.proposerUserId === currentUser.id || p.ceoOrder?.assigneeUserId === currentUser.id);
@@ -319,6 +326,11 @@ export const ProposalsView: React.FC = () => {
                       {p.assignedMeetingTitle && <div className="text-[10px] text-emerald-700 mt-0.5">جلسه: {p.assignedMeetingTitle}</div>}
                       {p.source === 'EXCEL_IMPORT' && (
                         <div className="text-[10px] text-teal-700 mt-0.5">منبع ثبت: ورود از Excel{p.sourceLetterNumber ? ` — نامه ${toPersianDigits(p.sourceLetterNumber)}` : ''}</div>
+                      )}
+                      {p.status === 'CEO_ORDER_ISSUED' && p.ceoOrder && (
+                        <div className="text-[10px] text-purple-700 mt-0.5 font-bold">
+                          مسئول اجرا: {p.ceoOrder.assigneeName} — وضعیت اجرا: {CEO_ORDER_STATUS_LABEL[p.ceoOrder.status]}
+                        </div>
                       )}
                     </td>
                     <td className="py-3 px-3 text-slate-600">{p.presenterName || p.confirmedPresenterName || '—'}</td>
@@ -426,6 +438,27 @@ export const ProposalsView: React.FC = () => {
               )}
             </div>
           ))}
+
+          {issuedOrders.length > 0 && (
+            <div className="pt-2 space-y-2.5">
+              <h4 className="text-xs font-bold text-slate-500 px-1">دستورات مستقیم صادرشده (پیگیری وضعیت اجرا)</h4>
+              {issuedOrders.map((p) => (
+                <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-1.5">
+                  <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
+                  <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-[11px] space-y-1">
+                    <div>{p.ceoOrder!.text}</div>
+                    <div>مسئول اجرا: {p.ceoOrder!.assigneeName} — مهلت: {toPersianDigits(p.ceoOrder!.deadlineJalali)}</div>
+                    <div className="font-bold">
+                      وضعیت اجرا:{' '}
+                      <span className={p.ceoOrder!.status === 'COMPLETED' ? 'text-emerald-700' : p.ceoOrder!.status === 'IN_PROGRESS' ? 'text-amber-700' : 'text-slate-600'}>
+                        {CEO_ORDER_STATUS_LABEL[p.ceoOrder!.status]}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
