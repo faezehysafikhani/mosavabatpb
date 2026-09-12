@@ -19,6 +19,39 @@ const getMinutesDiff = (start: string, end: string): number => {
   return diff > 0 ? diff : 30;
 };
 
+const timeToMinutes = (value: string): number => {
+  const [h, m] = toEnglishDigits(value).split(':').map(Number);
+  return h * 60 + m;
+};
+
+// Shared guard for both "add from تایید جلسه" and "add new agenda item":
+// the new slot must fall inside the meeting's own start/end window and must
+// not overlap any agenda item already added.
+const validateAgendaTimeSlot = (
+  slotStart: string,
+  slotEnd: string,
+  meetingStart: string,
+  meetingEnd: string,
+  existingAgendas: AgendaItem[]
+): string | null => {
+  const start = timeToMinutes(slotStart);
+  const end = timeToMinutes(slotEnd);
+  if (end <= start) return 'ساعت پایان بند باید بعد از ساعت شروع آن باشد.';
+  const meetingStartMin = timeToMinutes(meetingStart);
+  const meetingEndMin = timeToMinutes(meetingEnd);
+  if (start < meetingStartMin || end > meetingEndMin) {
+    return `بازه زمانی بند باید بین ساعت شروع (${meetingStart}) و پایان (${meetingEnd}) جلسه باشد.`;
+  }
+  const overlapping = existingAgendas.some((item) => {
+    if (!item.startTime || !item.endTime) return false;
+    const itemStart = timeToMinutes(item.startTime);
+    const itemEnd = timeToMinutes(item.endTime);
+    return start < itemEnd && end > itemStart;
+  });
+  if (overlapping) return 'این بازه زمانی با یکی از بندهای دستور جلسه دیگر همپوشانی دارد.';
+  return null;
+};
+
 export const CreateMeetingModal: React.FC = () => {
   const {
     isCreateMeetingOpen,
@@ -96,6 +129,12 @@ export const CreateMeetingModal: React.FC = () => {
       return;
     }
 
+    const timeError = validateAgendaTimeSlot(newAgendaStartTime, newAgendaEndTime, startTime, endTime, agendas);
+    if (timeError) {
+      showToast('خطا', timeError, 'error');
+      return;
+    }
+
     const selectedPresenter = availableUsers.find((u) => u.id === newAgendaPresenterId);
     const presenterName = selectedPresenter ? selectedPresenter.fullName : 'دبیر جلسه';
     const minutes = getMinutesDiff(newAgendaStartTime, newAgendaEndTime);
@@ -107,6 +146,8 @@ export const CreateMeetingModal: React.FC = () => {
       title: newAgendaTitle.trim(),
       presenter: presenterName,
       presenterName: presenterName,
+      startTime: newAgendaStartTime,
+      endTime: newAgendaEndTime,
       estimatedMinutes: minutes,
       allocatedMinutes: minutes,
       isDiscussed: false,
@@ -122,6 +163,13 @@ export const CreateMeetingModal: React.FC = () => {
   const handleAddFromProposal = () => {
     const proposal = confirmedProposals.find((p) => p.id === selectedProposalId);
     if (!proposal) return;
+
+    const timeError = validateAgendaTimeSlot(proposalStartTime, proposalEndTime, startTime, endTime, agendas);
+    if (timeError) {
+      showToast('خطا', timeError, 'error');
+      return;
+    }
+
     const minutes = getMinutesDiff(proposalStartTime, proposalEndTime);
     const presenterName = proposal.confirmedPresenterName || proposal.proposerName;
     const relatedUsers = availableUsers
@@ -136,6 +184,8 @@ export const CreateMeetingModal: React.FC = () => {
       presenter: presenterName,
       presenterName: presenterName,
       description: proposal.description,
+      startTime: proposalStartTime,
+      endTime: proposalEndTime,
       estimatedMinutes: minutes,
       allocatedMinutes: minutes,
       isDiscussed: false,

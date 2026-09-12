@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck, FileSpreadsheet, Download, Undo2, UploadCloud, Edit3
+  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, ClipboardCheck, FileSpreadsheet, Download, Undo2, UploadCloud, Edit3, LayoutGrid, Table2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { proposalService } from '../../services/proposalService';
@@ -9,6 +9,7 @@ import { mockDepartments } from '../../mock/data';
 import { toPersianDigits } from '../../utils/formatters';
 import { CreateProposalModal } from './CreateProposalModal';
 import { ExcelImportModal } from './ExcelImportModal';
+import { PersianDatePicker } from '../../components/common/PersianDatePicker';
 import { downloadProposalExcelTemplate, parseProposalExcelFile, ProposalImportParseResult } from '../../services/proposalExcelImportService';
 
 type ProposalTab = 'OFFICE' | 'CEO' | 'MINE';
@@ -22,7 +23,6 @@ const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
   RESUBMITTED: { label: 'اصلاح و ارسال مجدد', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
   NO_BOARD_REQUIRED: { label: 'عدم نیاز به طرح در هیأت‌مدیره', bg: 'bg-slate-50 text-slate-700 border-slate-200' },
   CEO_ORDER_ISSUED: { label: 'دستور مدیرعامل صادر شد', bg: 'bg-purple-50 text-purple-700 border-purple-200' },
-  CLOSED: { label: 'مختومه به دلایل دیگر', bg: 'bg-slate-100 text-slate-600 border-slate-300' },
   APPROVED: { label: 'تایید جلسات تایید نشده', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
   CONFIRMED_FOR_MEETING: { label: 'تایید جلسه شده', bg: 'bg-violet-50 text-violet-700 border-violet-200' },
   CONVERTED_TO_AGENDA: { label: 'تبدیل شده به بند دستور جلسه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -55,6 +55,9 @@ export const ProposalsView: React.FC = () => {
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
   const [orderAssignees, setOrderAssignees] = useState<Record<string, string>>({});
   const [orderDeadlines, setOrderDeadlines] = useState<Record<string, string>>({});
+  const [orderCompletionNotes, setOrderCompletionNotes] = useState<Record<string, string>>({});
+  const [ceoViewMode, setCeoViewMode] = useState<'cards' | 'grid'>('cards');
+  const [selectedCeoIds, setSelectedCeoIds] = useState<string[]>([]);
   const [orderFormOpen, setOrderFormOpen] = useState<Record<string, boolean>>({});
   const [revisionTitles, setRevisionTitles] = useState<Record<string, string>>({});
   const [revisionDescriptions, setRevisionDescriptions] = useState<Record<string, string>>({});
@@ -93,11 +96,30 @@ export const ProposalsView: React.FC = () => {
     triggerRefresh();
   };
 
+  const toggleCeoSelect = (id: string) => {
+    setSelectedCeoIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  // Bulk action is intentionally limited to APPROVED/REJECTED — every other
+  // decision (return for revision, no-board, direct order) needs per-item
+  // notes/assignee/deadline input and must still be done one at a time.
+  const handleBulkReview = async (decision: 'APPROVED' | 'REJECTED') => {
+    const targets = ceoQueue.filter((p) => selectedCeoIds.includes(p.id));
+    await Promise.all(targets.map((p) => proposalService.reviewProposal(p.id, decision, decisionNotes[p.id], currentUser)));
+    showToast(
+      decision === 'APPROVED' ? 'تایید گروهی' : 'رد گروهی',
+      `${toPersianDigits(targets.length)} مصوبه پیشنهادی ${decision === 'APPROVED' ? 'تایید شد' : 'رد شد'}.`,
+      decision === 'APPROVED' ? 'success' : 'warning'
+    );
+    setSelectedCeoIds([]);
+    triggerRefresh();
+  };
+
   const handleOpenConfirm = (proposal: Proposal) => {
     setConfirmingProposal(proposal);
   };
 
-  const handleCeoAlternative = async (proposal: Proposal, decision: 'RETURN' | 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED' | 'CLOSED') => {
+  const handleCeoAlternative = async (proposal: Proposal, decision: 'RETURN' | 'NO_BOARD_REQUIRED' | 'CEO_ORDER_ISSUED') => {
     try {
       const notes = decisionNotes[proposal.id] || '';
       if (decision === 'RETURN') {
@@ -194,7 +216,12 @@ export const ProposalsView: React.FC = () => {
   };
 
   const handleOrderStatus = async (proposal: Proposal, status: 'IN_PROGRESS' | 'COMPLETED') => {
-    try { await proposalService.updateCeoOrderStatus(proposal.id, status, currentUser); showToast('پیگیری دستور', 'وضعیت اجرای دستور مدیرعامل ثبت شد.', 'success'); triggerRefresh(); }
+    try {
+      await proposalService.updateCeoOrderStatus(proposal.id, status, currentUser, status === 'COMPLETED' ? orderCompletionNotes[proposal.id] : undefined);
+      showToast('پیگیری دستور', 'وضعیت اجرای دستور مدیرعامل ثبت شد.', 'success');
+      setOrderCompletionNotes((prev) => ({ ...prev, [proposal.id]: '' }));
+      triggerRefresh();
+    }
     catch (error) { showToast('خطا', error instanceof Error ? error.message : 'وضعیت ثبت نشد.', 'error'); }
   };
 
@@ -224,7 +251,7 @@ export const ProposalsView: React.FC = () => {
   const CEO_ORDER_STATUS_LABEL: Record<'PENDING' | 'IN_PROGRESS' | 'COMPLETED', string> = {
     PENDING: 'در انتظار اقدام', IN_PROGRESS: 'در حال اقدام', COMPLETED: 'انجام‌شده',
   };
-  const officeEligibleStatuses: ProposalStatus[] = ['APPROVED', 'CONFIRMED_FOR_MEETING', 'CONVERTED_TO_AGENDA', 'RETURNED_FOR_REVISION', 'RESUBMITTED', 'NO_BOARD_REQUIRED', 'CEO_ORDER_ISSUED', 'CLOSED', 'REJECTED'];
+  const officeEligibleStatuses: ProposalStatus[] = ['APPROVED', 'CONFIRMED_FOR_MEETING', 'CONVERTED_TO_AGENDA', 'RETURNED_FOR_REVISION', 'RESUBMITTED', 'NO_BOARD_REQUIRED', 'CEO_ORDER_ISSUED', 'REJECTED'];
   const officeItems = proposals.filter((p) => officeEligibleStatuses.includes(p.status) && (officeFilter === 'ALL' || p.status === officeFilter));
   const myProposals = proposals.filter((p) => p.proposerUserId === currentUser.id || p.ceoOrder?.assigneeUserId === currentUser.id);
 
@@ -370,12 +397,127 @@ export const ProposalsView: React.FC = () => {
 
       {tab === 'CEO' && isCeo && (
         <div className="space-y-3">
+          {ceoQueue.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2.5 bg-white rounded-2xl p-3 shadow-xs border border-slate-100">
+              <div className="flex items-center rounded-full border border-slate-200 bg-slate-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setCeoViewMode('cards')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${ceoViewMode === 'cards' ? 'bg-teal-800 text-white' : 'text-slate-600 hover:bg-white'}`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>کارتی</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCeoViewMode('grid')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${ceoViewMode === 'grid' ? 'bg-teal-800 text-white' : 'text-slate-600 hover:bg-white'}`}
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                  <span>گرید</span>
+                </button>
+              </div>
+
+              {selectedCeoIds.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-500">{toPersianDigits(selectedCeoIds.length)} مورد انتخاب شده</span>
+                  <button onClick={() => handleBulkReview('APPROVED')} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-full cursor-pointer">
+                    <CheckCircle2 className="w-3.5 h-3.5" />تایید گروهی
+                  </button>
+                  <button onClick={() => handleBulkReview('REJECTED')} className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold py-1.5 px-3 rounded-full cursor-pointer">
+                    <XCircle className="w-3.5 h-3.5" />رد گروهی
+                  </button>
+                  <button onClick={() => setSelectedCeoIds([])} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 px-2 cursor-pointer">لغو انتخاب</button>
+                </div>
+              )}
+            </div>
+          )}
+
           {ceoQueue.length === 0 ? (
             <div className="bg-white rounded-2xl p-10 text-center border border-slate-100 shadow-xs text-xs text-slate-400">
               مصوبه پیشنهادی در انتظار بررسی نیست.
             </div>
+          ) : ceoViewMode === 'grid' ? (
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-100 overflow-x-auto">
+              <table className="w-full min-w-[900px] text-right text-xs">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 border-b border-slate-100 text-[11px]">
+                    <th className="py-2.5 px-3 font-semibold w-8"></th>
+                    <th className="py-2.5 px-3 font-semibold">عنوان و توضیحات</th>
+                    <th className="py-2.5 px-3 font-semibold">پیشنهاددهنده</th>
+                    <th className="py-2.5 px-3 font-semibold">ارائه‌دهنده</th>
+                    <th className="py-2.5 px-3 font-semibold">تاریخ ثبت</th>
+                    <th className="py-2.5 px-3 font-semibold">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {ceoQueue.map((p) => (
+                    <React.Fragment key={p.id}>
+                      <tr className="hover:bg-slate-50/70 align-top">
+                        <td className="py-3 px-3">
+                          <input type="checkbox" checked={selectedCeoIds.includes(p.id)} onChange={() => toggleCeoSelect(p.id)} className="w-4 h-4 text-teal-700 rounded-md cursor-pointer" />
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-bold text-slate-800">{p.title}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">{p.description}</div>
+                          <div className="text-[10px] font-bold text-teal-700 mt-0.5">{p.proposalNumber}</div>
+                          {p.source === 'EXCEL_IMPORT' && <div className="text-[10px] text-teal-700 mt-0.5">منبع ثبت: ورود از Excel</div>}
+                        </td>
+                        <td className="py-3 px-3 text-slate-600">{p.proposerName} — {p.proposerDepartmentName}</td>
+                        <td className="py-3 px-3 text-slate-600">{p.presenterName || '—'}</td>
+                        <td className="py-3 px-3 text-slate-600">{toPersianDigits(p.dateJalali)}</td>
+                        <td className="py-3 px-3">
+                          <div className="space-y-1.5 min-w-[220px]">
+                            <input
+                              type="text"
+                              value={decisionNotes[p.id] || ''}
+                              onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                              placeholder="توضیحات تصمیم..."
+                              className="w-full text-[11px] p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none"
+                            />
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button onClick={() => handleReview(p, 'APPROVED')} title="تایید" className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"><CheckCircle2 className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => handleReview(p, 'REJECTED')} title="رد" className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer"><XCircle className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => handleCeoAlternative(p, 'RETURN')} title="برگشت جهت اصلاح" className="p-1.5 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 cursor-pointer"><RotateCcw className="w-3.5 h-3.5" /></button>
+                              <button onClick={() => handleCeoAlternative(p, 'NO_BOARD_REQUIRED')} title="عدم نیاز به طرح" className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 cursor-pointer text-[10px] font-bold px-2">عدم نیاز</button>
+                              <button
+                                onClick={() => setOrderFormOpen((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
+                                title="صدور دستور"
+                                className={`p-1.5 rounded-lg border cursor-pointer ${orderFormOpen[p.id] ? 'bg-purple-700 text-white border-purple-700' : 'bg-purple-50 text-purple-700 border-purple-200'}`}
+                              >
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {orderFormOpen[p.id] && (
+                        <tr>
+                          <td colSpan={6} className="p-3 bg-purple-50 border-t border-purple-200">
+                            <div className="space-y-2">
+                              <div className="text-[10px] font-bold text-purple-800">مشخصات دستور مستقیم مدیرعامل (فقط برای «صدور دستور»)</div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <select value={orderAssignees[p.id] || ''} onChange={(e) => setOrderAssignees((prev) => ({ ...prev, [p.id]: e.target.value }))} className="text-xs p-2.5 bg-white border border-purple-200 rounded-xl">
+                                  <option value="">مسئول دستور مدیرعامل...</option>
+                                  {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} — {user.title}</option>)}
+                                </select>
+                                <PersianDatePicker value={orderDeadlines[p.id] || ''} onChange={(value) => setOrderDeadlines((prev) => ({ ...prev, [p.id]: value }))} placeholder="مهلت دستور مدیرعامل" />
+                              </div>
+                              <button onClick={() => handleCeoAlternative(p, 'CEO_ORDER_ISSUED')} className="bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold py-2 px-4 rounded-xl cursor-pointer">ثبت دستور مدیرعامل</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : ceoQueue.map((p) => (
             <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <input type="checkbox" checked={selectedCeoIds.includes(p.id)} onChange={() => toggleCeoSelect(p.id)} className="w-4 h-4 mt-1 text-teal-700 rounded-md cursor-pointer shrink-0" />
+                <div className="flex-1">
               <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
               <div className="text-[10px] font-bold text-teal-700">{p.proposalNumber}</div>
               <p className="text-xs text-slate-600">{p.description}</p>
@@ -414,7 +556,6 @@ export const ProposalsView: React.FC = () => {
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" />صدور دستور
                 </button>
-                <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer"><Archive className="w-3.5 h-3.5" />مختومه به دلایل دیگر</button>
               </div>
 
               {/* Assignee/deadline apply only to "صدور دستور" (a direct CEO
@@ -431,11 +572,13 @@ export const ProposalsView: React.FC = () => {
                       <option value="">مسئول دستور مدیرعامل...</option>
                       {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.fullName} — {user.title}</option>)}
                     </select>
-                    <input value={orderDeadlines[p.id] || ''} onChange={(e) => setOrderDeadlines((prev) => ({ ...prev, [p.id]: e.target.value }))} placeholder="مهلت دستور، مثال ۱۴۰۵/۰۷/۳۰" className="text-xs p-2.5 bg-white border border-purple-200 rounded-xl" />
+                    <PersianDatePicker value={orderDeadlines[p.id] || ''} onChange={(value) => setOrderDeadlines((prev) => ({ ...prev, [p.id]: value }))} placeholder="مهلت دستور مدیرعامل" />
                   </div>
                   <button onClick={() => handleCeoAlternative(p, 'CEO_ORDER_ISSUED')} className="bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold py-2 px-4 rounded-xl cursor-pointer">ثبت دستور مدیرعامل</button>
                 </div>
               )}
+                </div>
+              </div>
             </div>
           ))}
 
@@ -454,6 +597,7 @@ export const ProposalsView: React.FC = () => {
                         {CEO_ORDER_STATUS_LABEL[p.ceoOrder!.status]}
                       </span>
                     </div>
+                    {p.ceoOrder!.completionNotes && <div className="p-2 bg-white/70 border border-purple-100 rounded-lg"><span className="font-bold text-purple-900">توضیحات اقدام انجام‌شده: </span>{p.ceoOrder!.completionNotes}</div>}
                   </div>
                 </div>
               ))}
@@ -490,7 +634,29 @@ export const ProposalsView: React.FC = () => {
               {p.managementDecisionNotes && (
                 <p className="text-[11px] text-slate-500">یادداشت تصمیم: {p.managementDecisionNotes}</p>
               )}
-              {p.ceoOrder && <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl text-[11px] space-y-1"><div className="font-extrabold text-purple-900">دستور مستقیم مدیرعامل</div><div>{p.ceoOrder.text}</div><div>مسئول: {p.ceoOrder.assigneeName} — مهلت: {toPersianDigits(p.ceoOrder.deadlineJalali)} — وضعیت: {p.ceoOrder.status === 'PENDING' ? 'در انتظار اقدام' : p.ceoOrder.status === 'IN_PROGRESS' ? 'در حال اقدام' : 'انجام‌شده'}</div>{p.ceoOrder.assigneeUserId === currentUser.id && p.ceoOrder.status !== 'COMPLETED' && <div className="flex gap-2 pt-1">{p.ceoOrder.status === 'PENDING' && <button onClick={() => handleOrderStatus(p, 'IN_PROGRESS')} className="bg-purple-700 text-white px-3 py-1.5 rounded-lg font-bold">شروع اقدام</button>}<button onClick={() => handleOrderStatus(p, 'COMPLETED')} className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">اعلام انجام</button></div>}</div>}
+              {p.ceoOrder && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded-2xl text-[11px] space-y-1">
+                  <div className="font-extrabold text-purple-900">دستور مستقیم مدیرعامل</div>
+                  <div>{p.ceoOrder.text}</div>
+                  <div>مسئول: {p.ceoOrder.assigneeName} — مهلت: {toPersianDigits(p.ceoOrder.deadlineJalali)} — وضعیت: {p.ceoOrder.status === 'PENDING' ? 'در انتظار اقدام' : p.ceoOrder.status === 'IN_PROGRESS' ? 'در حال اقدام' : 'انجام‌شده'}</div>
+                  {p.ceoOrder.completionNotes && <div className="p-2 bg-white/70 border border-purple-100 rounded-lg"><span className="font-bold text-purple-900">توضیحات اقدام انجام‌شده: </span>{p.ceoOrder.completionNotes}</div>}
+                  {p.ceoOrder.assigneeUserId === currentUser.id && p.ceoOrder.status !== 'COMPLETED' && (
+                    <div className="space-y-1.5 pt-1">
+                      <textarea
+                        rows={2}
+                        value={orderCompletionNotes[p.id] || ''}
+                        onChange={(e) => setOrderCompletionNotes((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                        placeholder="توضیح دهید چه اقدامی انجام شد (برای اعلام انجام الزامی است)..."
+                        className="w-full text-[11px] p-2 bg-white border border-purple-200 rounded-lg"
+                      />
+                      <div className="flex gap-2">
+                        {p.ceoOrder.status === 'PENDING' && <button onClick={() => handleOrderStatus(p, 'IN_PROGRESS')} className="bg-purple-700 text-white px-3 py-1.5 rounded-lg font-bold">شروع اقدام</button>}
+                        <button onClick={() => handleOrderStatus(p, 'COMPLETED')} className="bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold">اعلام انجام</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {p.status === 'RETURNED_FOR_REVISION' && (
                 <div className="p-3 bg-orange-50 border border-orange-200 rounded-2xl space-y-2">
                   <input value={revisionTitles[p.id] ?? p.title} onChange={(e) => setRevisionTitles((prev) => ({ ...prev, [p.id]: e.target.value }))} className="w-full text-xs p-2.5 bg-white border border-orange-200 rounded-xl" />

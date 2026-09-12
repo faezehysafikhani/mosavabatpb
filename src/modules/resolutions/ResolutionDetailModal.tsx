@@ -42,7 +42,7 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
   resolutionId,
   onClose,
 }) => {
-  const { currentUser, availableUsers, showToast, triggerRefresh, refreshTrigger } = useApp();
+  const { currentUser, availableUsers, showToast, triggerRefresh, refreshTrigger, hasPermission } = useApp();
 
   const [resolution, setResolution] = useState<Resolution | null>(null);
   const [meeting, setMeeting] = useState<Meeting | null>(null);
@@ -106,7 +106,11 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
   const isCurrentApprover = Boolean(currentStep) && (currentUser.id === currentStep.approverId || currentUser.role === 'ADMIN');
   const signatureWorkflow = resolution.signatureWorkflow;
   const activeSignature = signatureWorkflow?.steps[signatureWorkflow.currentStepIndex];
-  const canSign = activeSignature?.status === 'PENDING' && activeSignature.signerUserId === currentUser.id;
+  // Being the assigned signer for this step is necessary but no longer
+  // sufficient — SIGN_RESOLUTION must also be granted (via سطح دسترسی),
+  // so signing can be enabled for any role through the permission screen
+  // instead of being hardcoded to a fixed set of roles.
+  const canSign = activeSignature?.status === 'PENDING' && activeSignature.signerUserId === currentUser.id && hasPermission('SIGN_RESOLUTION');
   const invitees = Array.from(new Map([
     ...(resolution.mainResponsibleName ? [{
       id: resolution.mainResponsibleUserId || resolution.mainResponsibleName,

@@ -359,8 +359,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteUser = async (id: string): Promise<void> => {
     const target = availableUsers.find((user) => user.id === id);
     await userService.deleteUser(id);
-    setAvailableUsers((prev) => prev.filter((user) => user.id !== id));
-    showToast('حذف کاربر', `کاربر «${target?.fullName || ''}» حذف شد.`, 'info');
+    // deleteUser only deactivates (isActive = false) — the user must stay in
+    // the list (not be filtered out) so they remain visible and can be
+    // reactivated later; removing them here would make that impossible.
+    setAvailableUsers((prev) => prev.map((user) => (user.id === id ? { ...user, isActive: false } : user)));
+    showToast('غیرفعال‌سازی کاربر', `کاربر «${target?.fullName || ''}» غیرفعال شد.`, 'info');
     triggerRefresh();
   };
 

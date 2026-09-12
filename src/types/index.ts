@@ -62,7 +62,8 @@ export type PermissionKey =
   | 'CREATE_USER'
   | 'IMPORT_PROPOSALS_FROM_EXCEL'
   | 'VIEW_ORGANIZATION_ARCHIVE'
-  | 'MANAGE_ARCHIVE_FOLDERS';
+  | 'MANAGE_ARCHIVE_FOLDERS'
+  | 'SIGN_RESOLUTION';
 
 export interface User {
   id: string;
@@ -124,7 +125,6 @@ export type ProposalStatus =
   | 'RESUBMITTED'            // اصلاح و مجدداً برای مدیرعامل ارسال شده
   | 'NO_BOARD_REQUIRED'      // عدم نیاز به طرح در هیأت‌مدیره
   | 'CEO_ORDER_ISSUED'       // تبدیل به دستور مستقیم مدیرعامل
-  | 'CLOSED'                 // مختومه / بایگانی شده
   | 'CONFIRMED_FOR_MEETING'  // تایید جلسه شده (ارائه‌دهنده مشخص شد)، آماده افزودن به یک جلسه
   | 'CONVERTED_TO_AGENDA';   // تبدیل شده به بند دستور یک جلسه مشخص
 
@@ -147,6 +147,8 @@ export interface CeoDirectOrder {
   assigneeName: string;
   deadlineJalali: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+  // What the assignee actually did, entered when marking the order COMPLETED.
+  completionNotes?: string;
 }
 
 export interface Proposal {
@@ -251,6 +253,11 @@ export interface AgendaItem {
   title: string;
   presenter: string;
   presenterName?: string;
+  // Actual time slot within the meeting's own start/end window, used to
+  // validate the slot fits inside the meeting and does not overlap other
+  // agenda items — see CreateMeetingModal.
+  startTime?: string;
+  endTime?: string;
   estimatedMinutes?: number;
   allocatedMinutes?: number;
   status?: string;
