@@ -308,6 +308,35 @@ export const ResolutionDetailModal: React.FC<ResolutionDetailModalProps> = ({
 
                 <div>
                   <div className="flex items-center gap-2 mb-3"><PenTool className="w-4 h-4 text-slate-700" /><span className="font-extrabold text-slate-800">امضاهای دیجیتال ترتیبی</span></div>
+
+                  {/* Infographic: at-a-glance sequential-signature stepper.
+                      Purely visual, derived from the same signatureWorkflow
+                      data as the card grid below — no new state or logic. */}
+                  <div className="flex items-center mb-5 px-2">
+                    {signatureWorkflow.steps.map((step, idx) => {
+                      const isSigned = step.status === 'SIGNED';
+                      const isCurrent = step.status === 'PENDING';
+                      const circleClass = isSigned
+                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                        : isCurrent
+                        ? 'bg-white border-amber-500 text-amber-600 ring-4 ring-amber-100'
+                        : 'bg-white border-slate-300 text-slate-400';
+                      return (
+                        <React.Fragment key={step.id}>
+                          <div className="flex flex-col items-center gap-1.5 shrink-0">
+                            <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center font-extrabold text-xs ${circleClass}`}>
+                              {isSigned ? <Check className="w-4 h-4" /> : toPersianDigits(step.order)}
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-600 whitespace-nowrap">{step.signerRole === 'OFFICE_MANAGER' ? 'مسئول دفتر' : step.signerRole === 'CEO' ? 'مدیرعامل' : 'ادمین'}</span>
+                          </div>
+                          {idx < signatureWorkflow.steps.length - 1 && (
+                            <div className={`flex-1 h-0.5 mx-1 mb-4 ${isSigned ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {signatureWorkflow.steps.map((step) => {
                       const statusLabel = step.status === 'SIGNED' ? 'امضا شده' : step.status === 'PENDING' ? 'در انتظار امضا' : 'در انتظار نوبت';
