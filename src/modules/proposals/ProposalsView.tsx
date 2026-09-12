@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck, FileSpreadsheet, Download, Undo2
+  Lightbulb, Plus, Calendar, CheckCircle2, XCircle, Inbox, FileCheck2, X, RotateCcw, Archive, ClipboardCheck, FileSpreadsheet, Download, Undo2, UploadCloud, Edit3
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { proposalService } from '../../services/proposalService';
 import { Proposal, ProposalStatus } from '../../types';
+import { mockDepartments } from '../../mock/data';
 import { toPersianDigits } from '../../utils/formatters';
 import { CreateProposalModal } from './CreateProposalModal';
 import { ExcelImportModal } from './ExcelImportModal';
-import { downloadProposalExcelTemplate } from '../../services/proposalExcelImportService';
+import { downloadProposalExcelTemplate, parseProposalExcelFile, ProposalImportParseResult } from '../../services/proposalExcelImportService';
 
 type ProposalTab = 'OFFICE' | 'CEO' | 'MINE';
 type OfficeStatusFilter = 'APPROVED' | 'CONFIRMED_FOR_MEETING' | 'CONVERTED_TO_AGENDA' | 'NO_BOARD_REQUIRED' | 'ALL';
@@ -21,7 +22,7 @@ const STATUS_META: Record<ProposalStatus, { label: string; bg: string }> = {
   RESUBMITTED: { label: 'اصلاح و ارسال مجدد', bg: 'bg-amber-50 text-amber-700 border-amber-200' },
   NO_BOARD_REQUIRED: { label: 'عدم نیاز به طرح در هیأت‌مدیره', bg: 'bg-slate-50 text-slate-700 border-slate-200' },
   CEO_ORDER_ISSUED: { label: 'دستور مدیرعامل صادر شد', bg: 'bg-purple-50 text-purple-700 border-purple-200' },
-  CLOSED: { label: 'مختومه / بایگانی', bg: 'bg-slate-100 text-slate-600 border-slate-300' },
+  CLOSED: { label: 'مختومه به دلایل دیگر', bg: 'bg-slate-100 text-slate-600 border-slate-300' },
   APPROVED: { label: 'تایید جلسات تایید نشده', bg: 'bg-blue-50 text-blue-700 border-blue-200' },
   CONFIRMED_FOR_MEETING: { label: 'تایید جلسه شده', bg: 'bg-violet-50 text-violet-700 border-violet-200' },
   CONVERTED_TO_AGENDA: { label: 'تبدیل شده به بند دستور جلسه', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -59,6 +60,16 @@ export const ProposalsView: React.FC = () => {
   const [revisionDescriptions, setRevisionDescriptions] = useState<Record<string, string>>({});
   const [revisionRationales, setRevisionRationales] = useState<Record<string, string>>({});
   const [confirmingProposal, setConfirmingProposal] = useState<Proposal | null>(null);
+  // Office-manager resubmission of a RETURNED_FOR_REVISION proposal they
+  // themselves submitted (always true for Excel-imported ones — the office
+  // manager is recorded as the proposer for every imported row). Excel-sourced
+  // proposals must be corrected by re-uploading a fixed row, not by editing
+  // fields inline, so this stays a separate modal from the plain-text
+  // resubmit form already used in the "MINE" tab.
+  const [resubmittingProposal, setResubmittingProposal] = useState<Proposal | null>(null);
+  const [resubmitExcelResult, setResubmitExcelResult] = useState<ProposalImportParseResult | null>(null);
+  const [resubmitExcelError, setResubmitExcelError] = useState<string | null>(null);
+  const [isResubmittingExcel, setIsResubmittingExcel] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -118,9 +129,67 @@ export const ProposalsView: React.FC = () => {
         rationale: revisionRationales[proposal.id] ?? proposal.rationale,
       }, currentUser);
       showToast('ارسال مجدد', 'پیشنهاد اصلاح‌شده به کارتابل مدیرعامل ارسال شد.', 'success');
+      if (resubmittingProposal?.id === proposal.id) closeResubmitModal();
       triggerRefresh();
     } catch (error) {
       showToast('خطا', error instanceof Error ? error.message : 'ارسال مجدد انجام نشد.', 'error');
+    }
+  };
+
+  const closeResubmitModal = () => {
+    setResubmittingProposal(null);
+    setResubmitExcelResult(null);
+    setResubmitExcelError(null);
+  };
+
+  const handleResubmitExcelFile = async (file: File) => {
+    if (!resubmittingProposal) return;
+    setResubmitExcelResult(null);
+    setResubmitExcelError(null);
+    try {
+      const existingProposalsRes = await proposalService.getProposals({ pageSize: 1000 });
+      const result = await parseProposalExcelFile(file, {
+        departments: mockDepartments,
+        users: availableUsers,
+        // exclude the proposal being corrected itself, otherwise it always
+        // matches its own letter number/department and is flagged as a
+        // duplicate of itself.
+        existingProposals: (existingProposalsRes.isSuccess ? existingProposalsRes.data.items : []).filter((item) => item.id !== resubmittingProposal.id),
+      });
+      setResubmitExcelResult(result);
+    } catch (error) {
+      setResubmitExcelError(error instanceof Error ? error.message : 'فایل قابل پردازش نیست.');
+    }
+  };
+
+  const handleConfirmExcelResubmit = async () => {
+    if (!resubmittingProposal || !resubmitExcelResult) return;
+    const row = resubmitExcelResult.rows[0];
+    if (!row || !row.isValid || !row.matchedDepartment || !row.matchedPresenter) {
+      showToast('خطا', 'ردیف فایل معتبر نیست؛ خطاهای اعلام‌شده را برطرف و دوباره تلاش کنید.', 'error');
+      return;
+    }
+    setIsResubmittingExcel(true);
+    try {
+      await proposalService.resubmitProposal(resubmittingProposal.id, {
+        title: row.title,
+        description: row.description,
+        rationale: row.notes,
+        presenterUserId: row.matchedPresenter.id,
+        presenterName: row.matchedPresenter.fullName,
+        proposerDepartmentId: row.matchedDepartment.id,
+        proposerDepartmentName: row.matchedDepartment.name,
+        sourceLetterNumber: row.letterNumber,
+        sourceLetterDateJalali: row.letterDateJalali,
+        sourceLetterSubject: row.letterSubject,
+      }, currentUser);
+      showToast('ارسال مجدد', 'پیشنهاد اصلاح‌شده از فایل Excel به کارتابل مدیرعامل ارسال شد.', 'success');
+      closeResubmitModal();
+      triggerRefresh();
+    } catch (error) {
+      showToast('خطا', error instanceof Error ? error.message : 'ارسال مجدد انجام نشد.', 'error');
+    } finally {
+      setIsResubmittingExcel(false);
     }
   };
 
@@ -148,6 +217,13 @@ export const ProposalsView: React.FC = () => {
   };
 
   const ceoQueue = proposals.filter((p) => ['PENDING_CEO_REVIEW', 'RESUBMITTED'].includes(p.status));
+  // CEO_ORDER_ISSUED proposals leave ceoQueue for good once decided, so this
+  // is the only place the CEO can see whether the assignee has since acted
+  // on the order (ceoOrder.status), not just that the order was issued.
+  const issuedOrders = proposals.filter((p) => p.status === 'CEO_ORDER_ISSUED' && p.ceoOrder);
+  const CEO_ORDER_STATUS_LABEL: Record<'PENDING' | 'IN_PROGRESS' | 'COMPLETED', string> = {
+    PENDING: 'در انتظار اقدام', IN_PROGRESS: 'در حال اقدام', COMPLETED: 'انجام‌شده',
+  };
   const officeEligibleStatuses: ProposalStatus[] = ['APPROVED', 'CONFIRMED_FOR_MEETING', 'CONVERTED_TO_AGENDA', 'RETURNED_FOR_REVISION', 'RESUBMITTED', 'NO_BOARD_REQUIRED', 'CEO_ORDER_ISSUED', 'CLOSED', 'REJECTED'];
   const officeItems = proposals.filter((p) => officeEligibleStatuses.includes(p.status) && (officeFilter === 'ALL' || p.status === officeFilter));
   const myProposals = proposals.filter((p) => p.proposerUserId === currentUser.id || p.ceoOrder?.assigneeUserId === currentUser.id);
@@ -251,6 +327,11 @@ export const ProposalsView: React.FC = () => {
                       {p.source === 'EXCEL_IMPORT' && (
                         <div className="text-[10px] text-teal-700 mt-0.5">منبع ثبت: ورود از Excel{p.sourceLetterNumber ? ` — نامه ${toPersianDigits(p.sourceLetterNumber)}` : ''}</div>
                       )}
+                      {p.status === 'CEO_ORDER_ISSUED' && p.ceoOrder && (
+                        <div className="text-[10px] text-purple-700 mt-0.5 font-bold">
+                          مسئول اجرا: {p.ceoOrder.assigneeName} — وضعیت اجرا: {CEO_ORDER_STATUS_LABEL[p.ceoOrder.status]}
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-slate-600">{p.presenterName || p.confirmedPresenterName || '—'}</td>
                     <td className="py-3 px-3 text-slate-600">
@@ -264,6 +345,12 @@ export const ProposalsView: React.FC = () => {
                         <button onClick={() => handleOpenConfirm(p)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
                           <FileCheck2 className="w-3.5 h-3.5" />
                           <span>تبدیل به تایید جلسه</span>
+                        </button>
+                      )}
+                      {p.status === 'RETURNED_FOR_REVISION' && p.proposerUserId === currentUser.id && (
+                        <button onClick={() => setResubmittingProposal(p)} className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-bold py-1.5 px-3 rounded-xl cursor-pointer">
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>اصلاح و ارسال مجدد</span>
                         </button>
                       )}
                       {p.status === 'NO_BOARD_REQUIRED' && (
@@ -319,15 +406,15 @@ export const ProposalsView: React.FC = () => {
                   <XCircle className="w-3.5 h-3.5" />
                   <span>رد</span>
                 </button>
-                <button onClick={() => handleCeoAlternative(p, 'RETURN')} className="flex items-center gap-1.5 bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold py-2 px-3 rounded-xl"><RotateCcw className="w-3.5 h-3.5" />برگشت جهت اصلاح</button>
-                <button onClick={() => handleCeoAlternative(p, 'NO_BOARD_REQUIRED')} className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl">عدم نیاز به طرح</button>
+                <button onClick={() => handleCeoAlternative(p, 'RETURN')} className="flex items-center gap-1.5 bg-orange-50 text-orange-700 border border-orange-200 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer"><RotateCcw className="w-3.5 h-3.5" />برگشت جهت اصلاح</button>
+                <button onClick={() => handleCeoAlternative(p, 'NO_BOARD_REQUIRED')} className="bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer">عدم نیاز به طرح</button>
                 <button
                   onClick={() => setOrderFormOpen((prev) => ({ ...prev, [p.id]: !prev[p.id] }))}
                   className={`flex items-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl border cursor-pointer ${orderFormOpen[p.id] ? 'bg-purple-700 text-white border-purple-700' : 'bg-purple-50 text-purple-700 border-purple-200'}`}
                 >
                   <ClipboardCheck className="w-3.5 h-3.5" />صدور دستور
                 </button>
-                <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl"><Archive className="w-3.5 h-3.5" />بایگانی</button>
+                <button onClick={() => handleCeoAlternative(p, 'CLOSED')} className="flex items-center gap-1.5 bg-slate-50 text-slate-500 border border-slate-200 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer"><Archive className="w-3.5 h-3.5" />مختومه به دلایل دیگر</button>
               </div>
 
               {/* Assignee/deadline apply only to "صدور دستور" (a direct CEO
@@ -351,6 +438,27 @@ export const ProposalsView: React.FC = () => {
               )}
             </div>
           ))}
+
+          {issuedOrders.length > 0 && (
+            <div className="pt-2 space-y-2.5">
+              <h4 className="text-xs font-bold text-slate-500 px-1">دستورات مستقیم صادرشده (پیگیری وضعیت اجرا)</h4>
+              {issuedOrders.map((p) => (
+                <div key={p.id} className="bg-white rounded-2xl p-4 shadow-xs border border-slate-100 space-y-1.5">
+                  <h4 className="text-sm font-bold text-slate-800">{p.title}</h4>
+                  <div className="p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-[11px] space-y-1">
+                    <div>{p.ceoOrder!.text}</div>
+                    <div>مسئول اجرا: {p.ceoOrder!.assigneeName} — مهلت: {toPersianDigits(p.ceoOrder!.deadlineJalali)}</div>
+                    <div className="font-bold">
+                      وضعیت اجرا:{' '}
+                      <span className={p.ceoOrder!.status === 'COMPLETED' ? 'text-emerald-700' : p.ceoOrder!.status === 'IN_PROGRESS' ? 'text-amber-700' : 'text-slate-600'}>
+                        {CEO_ORDER_STATUS_LABEL[p.ceoOrder!.status]}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -425,6 +533,99 @@ export const ProposalsView: React.FC = () => {
               <button onClick={() => setConfirmingProposal(null)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer">انصراف</button>
               <button onClick={handleConfirmForMeeting} className="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-xs cursor-pointer">تایید</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Office-manager resubmission of a RETURNED_FOR_REVISION proposal.
+          Excel-sourced proposals require a corrected Excel row re-upload;
+          manually-created ones reuse the same inline text form as the
+          "MINE" tab. */}
+      {resubmittingProposal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <RotateCcw className="w-4 h-4 text-orange-600" />
+                اصلاح و ارسال مجدد پیشنهاد
+              </h3>
+              <button onClick={closeResubmitModal} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-xs text-slate-600">{resubmittingProposal.title}</p>
+            {resubmittingProposal.managementDecisionNotes && (
+              <p className="text-[11px] p-2.5 bg-orange-50 border border-orange-200 rounded-xl text-orange-800">دلیل برگشت: {resubmittingProposal.managementDecisionNotes}</p>
+            )}
+
+            {resubmittingProposal.source === 'EXCEL_IMPORT' ? (
+              <div className="space-y-3">
+                <p className="text-[11px] text-slate-500">
+                  این پیشنهاد از طریق Excel وارد شده است. برای اصلاح، یک فایل Excel اصلاح‌شده (با همان قالب ورود پیشنهادها، شامل یک ردیف) را دوباره بارگذاری کنید.
+                </p>
+                <label className="flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-200 hover:border-orange-400 rounded-xl p-4 cursor-pointer text-xs font-bold text-slate-600">
+                  <UploadCloud className="w-4 h-4 text-orange-600" />
+                  <span>انتخاب فایل Excel اصلاح‌شده</span>
+                  <input
+                    type="file"
+                    accept=".xlsx"
+                    className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) handleResubmitExcelFile(e.target.files[0]); e.target.value = ''; }}
+                  />
+                </label>
+                {resubmitExcelError && <p className="text-[11px] text-rose-600 font-bold">{resubmitExcelError}</p>}
+                {resubmitExcelResult && (
+                  resubmitExcelResult.rows[0]?.isValid ? (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 space-y-1">
+                      <div className="font-bold">ردیف معتبر است و آماده ارسال مجدد:</div>
+                      <div>عنوان: {resubmitExcelResult.rows[0].title}</div>
+                      <div>سازمان: {resubmitExcelResult.rows[0].matchedDepartment?.name}</div>
+                      <div>ارائه‌دهنده: {resubmitExcelResult.rows[0].matchedPresenter?.fullName}</div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-[11px] text-rose-700 space-y-1">
+                      <div className="font-bold">ردیف دارای خطا است:</div>
+                      <ul className="list-disc pr-4">
+                        {(resubmitExcelResult.rows[0]?.errors || ['ردیف معتبری در فایل یافت نشد.']).map((err, idx) => <li key={idx}>{err}</li>)}
+                      </ul>
+                    </div>
+                  )
+                )}
+                <div className="flex items-center justify-end gap-2.5 pt-1">
+                  <button onClick={closeResubmitModal} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer">انصراف</button>
+                  <button
+                    onClick={handleConfirmExcelResubmit}
+                    disabled={isResubmittingExcel || !resubmitExcelResult?.rows[0]?.isValid}
+                    className="px-5 py-2 text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white rounded-full shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ارسال مجدد
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  value={revisionTitles[resubmittingProposal.id] ?? resubmittingProposal.title}
+                  onChange={(e) => setRevisionTitles((prev) => ({ ...prev, [resubmittingProposal.id]: e.target.value }))}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+                <textarea
+                  rows={3}
+                  value={revisionDescriptions[resubmittingProposal.id] ?? resubmittingProposal.description}
+                  onChange={(e) => setRevisionDescriptions((prev) => ({ ...prev, [resubmittingProposal.id]: e.target.value }))}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+                <textarea
+                  rows={2}
+                  value={revisionRationales[resubmittingProposal.id] ?? resubmittingProposal.rationale ?? ''}
+                  onChange={(e) => setRevisionRationales((prev) => ({ ...prev, [resubmittingProposal.id]: e.target.value }))}
+                  placeholder="دلایل و ضرورت"
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                />
+                <div className="flex items-center justify-end gap-2.5 pt-1">
+                  <button onClick={closeResubmitModal} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-full cursor-pointer">انصراف</button>
+                  <button onClick={() => handleResubmit(resubmittingProposal)} className="px-5 py-2 text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white rounded-full shadow-xs cursor-pointer">ذخیره اصلاحات و ارسال مجدد</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
