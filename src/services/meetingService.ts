@@ -283,7 +283,11 @@ class MockMeetingService implements IMeetingService {
   }
 
   public async sendInvitations(id: string, actor: User): Promise<ApiResponse<Meeting>> {
-    if (!['SECRETARY', 'ADMIN'].includes(actor.role)) throw new Error('فقط دبیرخانه مجاز به ارسال دعوتنامه است');
+    // Sending now happens automatically the instant the CEO approves the
+    // agenda (see reviewAgenda callers), so the CEO must also be an
+    // authorized actor here — not just SECRETARY/ADMIN as when this was a
+    // separate manual secretariat action.
+    if (!['SECRETARY', 'ADMIN', 'CEO'].includes(actor.role)) throw new Error('فقط دبیرخانه یا مدیرعامل مجاز به ارسال دعوتنامه است');
     const meetings = this.getMeetingsData();
     const meeting = meetings.find((item) => item.id === id);
     if (!meeting) throw new Error('جلسه یافت نشد');

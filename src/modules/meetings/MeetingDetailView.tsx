@@ -76,6 +76,19 @@ export const MeetingDetailView: React.FC<MeetingDetailViewProps> = ({ meetingId 
 
       if (meetRes.isSuccess && meetRes.data) {
         setMeeting(meetRes.data);
+        // Self-heal meetings left stuck in READY_FOR_INVITATION by the
+        // earlier bug where auto-sending right after CEO approval rejected
+        // the CEO as an unauthorized actor — now that sendInvitations also
+        // accepts CEO, finish the send instead of leaving it stranded
+        // forever with no manual button left to retry it.
+        if (meetRes.data.status === 'READY_FOR_INVITATION' && ['SECRETARY', 'ADMIN', 'CEO'].includes(currentUser.role)) {
+          try {
+            const sent = await meetingService.sendInvitations(meetingId, currentUser);
+            if (sent.isSuccess) setMeeting(sent.data);
+          } catch {
+            // leave as-is; a privileged viewer without meeting-specific rights may still fail here
+          }
+        }
       }
       if (resRes.isSuccess) {
         setResolutions(resRes.data.items);
