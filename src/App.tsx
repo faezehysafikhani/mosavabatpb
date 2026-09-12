@@ -18,6 +18,7 @@ import { ResolutionListView } from './modules/resolutions/ResolutionListView';
 import { MyTasksView } from './modules/tasks/MyTasksView';
 import { ApprovalsView } from './modules/approvals/ApprovalsView';
 import { ReportsView } from './modules/reports/ReportsView';
+import { InfographicsView } from './modules/infographics/InfographicsView';
 import { CalendarView } from './modules/calendar/CalendarView';
 import { UsersView } from './modules/users/UsersView';
 import { UserGuideView } from './modules/guide/UserGuideView';
@@ -68,6 +69,8 @@ const AppContent: React.FC = () => {
         return canViewApprovals ? <ApprovalsView /> : <AccessDenied />;
       case 'reports':
         return <ReportsView />;
+      case 'infographics':
+        return <InfographicsView />;
       case 'calendar':
         return <CalendarView />;
       case 'users':
