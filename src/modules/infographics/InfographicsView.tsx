@@ -112,8 +112,9 @@ export const InfographicsView: React.FC = () => {
     (async () => {
       setLoading(true);
       try {
+        const isAdmin = currentUser.role === 'ADMIN';
         const [kpiRes, deptRes, trendRes, resDistRes, proposalsRes] = await Promise.all([
-          reportService.getDashboardKPIs(currentUser.id),
+          reportService.getDashboardKPIs(isAdmin ? undefined : currentUser.id),
           reportService.getDepartmentPerformances(),
           reportService.getMonthlyTrends(),
           reportService.getResolutionStatusDistribution(),

@@ -17,13 +17,14 @@
 import { ArchiveFolder, ArchiveItem, ApiResponse, User } from '../types';
 import { apiClient } from './api/apiClient';
 import { loadLocalValue, saveLocalValue } from './localStore';
+import { mockArchiveFolders, mockArchiveItems } from '../mock/data';
 
 const FOLDERS_KEY = 'archiveFolders';
 const ITEMS_KEY = 'archiveItems';
 
-const getFoldersData = (): ArchiveFolder[] => loadLocalValue<ArchiveFolder[]>(FOLDERS_KEY, []);
+const getFoldersData = (): ArchiveFolder[] => loadLocalValue<ArchiveFolder[]>(FOLDERS_KEY, mockArchiveFolders);
 const saveFoldersData = (folders: ArchiveFolder[]) => saveLocalValue(FOLDERS_KEY, folders);
-const getItemsData = (): ArchiveItem[] => loadLocalValue<ArchiveItem[]>(ITEMS_KEY, []);
+const getItemsData = (): ArchiveItem[] => loadLocalValue<ArchiveItem[]>(ITEMS_KEY, mockArchiveItems);
 const saveItemsData = (items: ArchiveItem[]) => saveLocalValue(ITEMS_KEY, items);
 
 export interface IArchiveService {
