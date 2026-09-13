@@ -90,6 +90,7 @@ export const CreateMeetingModal: React.FC = () => {
       setConsumedProposalIds([]);
       setSelectedProposalId('');
       setProposalRelatedUserIds([]);
+      setAgendaError(null);
     }
   }, [isCreateMeetingOpen, createMeetingInitialDate]);
 
@@ -120,20 +121,25 @@ export const CreateMeetingModal: React.FC = () => {
   // Selected members
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Shown as a banner inside the modal itself (not the global toast), since
+  // the toast renders behind this modal's own backdrop/z-index and was
+  // never actually visible to the user when this validation failed.
+  const [agendaError, setAgendaError] = useState<string | null>(null);
 
   if (!isCreateMeetingOpen) return null;
 
   const handleAddAgenda = () => {
     if (!newAgendaTitle.trim()) {
-      showToast('خطا', 'لطفاً عنوان دستور جلسه را وارد کنید', 'error');
+      setAgendaError('لطفاً عنوان دستور جلسه را وارد کنید');
       return;
     }
 
     const timeError = validateAgendaTimeSlot(newAgendaStartTime, newAgendaEndTime, startTime, endTime, agendas);
     if (timeError) {
-      showToast('خطا', timeError, 'error');
+      setAgendaError(timeError);
       return;
     }
+    setAgendaError(null);
 
     const selectedPresenter = availableUsers.find((u) => u.id === newAgendaPresenterId);
     const presenterName = selectedPresenter ? selectedPresenter.fullName : 'دبیر جلسه';
@@ -166,9 +172,10 @@ export const CreateMeetingModal: React.FC = () => {
 
     const timeError = validateAgendaTimeSlot(proposalStartTime, proposalEndTime, startTime, endTime, agendas);
     if (timeError) {
-      showToast('خطا', timeError, 'error');
+      setAgendaError(timeError);
       return;
     }
+    setAgendaError(null);
 
     const minutes = getMinutesDiff(proposalStartTime, proposalEndTime);
     const presenterName = proposal.confirmedPresenterName || proposal.proposerName;
@@ -423,6 +430,19 @@ export const CreateMeetingModal: React.FC = () => {
               <span className="w-2 h-2 rounded-full bg-teal-600"></span>
               دستور کار جلسه (Agendas)
             </h4>
+
+            {agendaError && (
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-2xl flex items-start justify-between gap-2.5">
+                <p className="text-xs font-bold text-rose-700 leading-relaxed">{agendaError}</p>
+                <button
+                  type="button"
+                  onClick={() => setAgendaError(null)}
+                  className="text-rose-400 hover:text-rose-600 shrink-0 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Add agenda item from a confirmed proposed resolution ("تایید جلسه") */}
             {confirmedProposals.length > 0 && (
