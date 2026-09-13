@@ -4,6 +4,8 @@ import { apiClient } from './api/apiClient';
 import { isMeetingRelatedToUser, isResolutionRelatedToUser } from './userScope';
 import { loadLocalCollection } from './localStore';
 
+const JALALI_MONTH_NAMES = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+
 export interface MonthlyMeetingTrend {
   month: string;
   meetingsCount: number;
@@ -124,15 +126,45 @@ class MockReportService implements IReportService {
   }
 
   public async getMonthlyTrends(): Promise<ApiResponse<MonthlyMeetingTrend[]>> {
-    const trends: MonthlyMeetingTrend[] = [
-      { month: 'فروردین', meetingsCount: 4, resolutionsCount: 10, completedResolutionsCount: 9 },
-      { month: 'اردیبهشت', meetingsCount: 6, resolutionsCount: 15, completedResolutionsCount: 13 },
-      { month: 'خرداد', meetingsCount: 5, resolutionsCount: 12, completedResolutionsCount: 11 },
-      { month: 'تیر', meetingsCount: 7, resolutionsCount: 18, completedResolutionsCount: 15 },
-      { month: 'مرداد', meetingsCount: 6, resolutionsCount: 16, completedResolutionsCount: 12 },
-      { month: 'شهریور', meetingsCount: 8, resolutionsCount: 22, completedResolutionsCount: 14 },
-    ];
+    // Derived entirely from the real meetings/resolutions data (never a
+    // fixed/sample series) so this chart always matches whatever is
+    // actually in the system, month by month.
+    const meetings = loadLocalCollection('meetings', mockMeetings);
+    const resolutions = loadLocalCollection('resolutions', mockResolutions);
+    // dateJalali is stored with Persian digits (e.g. "۱۴۰۵/۰۶/۰۸"), so
+    // normalize to ASCII before parsing.
+    const toEnglishDigits = (value: string) => value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
+    const jalaliMonthName = (dateJalali: string): string | null => {
+      const monthNumber = parseInt(toEnglishDigits(dateJalali).split('/')[1], 10);
+      if (!monthNumber || monthNumber < 1 || monthNumber > 12) return null;
+      return JALALI_MONTH_NAMES[monthNumber - 1];
+    };
 
+    const byMonth = new Map<string, MonthlyMeetingTrend>();
+    const ensureMonth = (month: string): MonthlyMeetingTrend => {
+      let entry = byMonth.get(month);
+      if (!entry) {
+        entry = { month, meetingsCount: 0, resolutionsCount: 0, completedResolutionsCount: 0 };
+        byMonth.set(month, entry);
+      }
+      return entry;
+    };
+
+    meetings.forEach((meeting) => {
+      const month = jalaliMonthName(meeting.dateJalali);
+      if (!month) return;
+      ensureMonth(month).meetingsCount += 1;
+    });
+    resolutions.forEach((resolution) => {
+      const meeting = meetings.find((item) => item.id === resolution.meetingId);
+      const month = jalaliMonthName(meeting?.dateJalali || resolution.assignedDateJalali || '');
+      if (!month) return;
+      const entry = ensureMonth(month);
+      entry.resolutionsCount += 1;
+      if (resolution.executionStatus === 'APPROVED_CLOSED') entry.completedResolutionsCount += 1;
+    });
+
+    const trends = JALALI_MONTH_NAMES.filter((month) => byMonth.has(month)).map((month) => byMonth.get(month)!);
     return apiClient.simulateNetwork(trends, 120);
   }
 
